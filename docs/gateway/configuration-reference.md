@@ -2505,6 +2505,19 @@ See [Plugins](/tools/plugin).
 - Optional response hardening header:
   - `gateway.http.securityHeaders.strictTransportSecurity` (set only for HTTPS origins you control; see [Trusted Proxy Auth](/gateway/trusted-proxy-auth#tls-termination-and-hsts))
 
+### RPC attachments (`gateway.rpcAttachments`)
+
+Limits and MIME policy for `agent` / `chat.send` (inbound) and `chat.history` (outbound) file attachments. See [Gateway protocol — Attachments and media](/gateway/protocol#attachments-and-media-rpc) and the [Gateway RPC attachments contract](https://github.com/openclaw/openclaw/blob/main/specs/001-gateway-rpc-file-transfer/contracts/gateway-rpc-attachments.md).
+
+| Key                             | Default | Description                                             |
+| ------------------------------- | ------- | ------------------------------------------------------- |
+| `perAttachmentMaxBytes`         | 100 MB  | Max decoded bytes per attachment (inbound).             |
+| `aggregateMaxBytes`             | —       | Optional. Max total decoded bytes per request.          |
+| `maxCount`                      | —       | Optional. Max attachments per request.                  |
+| `mimeAllowlist`                 | —       | Optional. Only these MIME types accepted.               |
+| `mimeBlocklist`                 | —       | Optional. These MIME types rejected.                    |
+| `outgoingPerAttachmentMaxBytes` | 100 MB  | Max decoded bytes per attachment in chat.history media. |
+
 ### Multi-instance isolation
 
 Run multiple gateways on one host with unique ports and state dirs:

@@ -390,6 +390,35 @@ describe("gateway server agent", () => {
     expect(call.accountId).toBe("kev");
   });
 
+  test("agent without attachments succeeds and response shape unchanged", async () => {
+    setRegistry(defaultRegistry);
+    await setTestSessionStore({
+      entries: {
+        main: {
+          sessionId: "sess-main-no-attach",
+          updatedAt: Date.now(),
+        },
+      },
+    });
+    const res = await rpcReq(ws, "agent", {
+      message: "hello",
+      sessionKey: "main",
+      idempotencyKey: "idem-agent-no-attachments",
+    });
+    expect(res.ok).toBe(true);
+    expect(res.payload?.runId).toBeDefined();
+    expect(typeof res.payload?.status).toBe("string");
+
+    const call = latestAgentCall();
+    expect(call.sessionKey).toBe("agent:main:main");
+    expect(typeof call.message).toBe("string");
+    expect((call.message as string).includes("hello")).toBe(true);
+    const attachments = call.attachments as unknown[] | undefined;
+    expect(
+      attachments === undefined || (Array.isArray(attachments) && attachments.length === 0),
+    ).toBe(true);
+  });
+
   test("agent forwards image attachments as images[]", async () => {
     setRegistry(defaultRegistry);
     await setTestSessionStore({
@@ -426,6 +455,83 @@ describe("gateway server agent", () => {
     expect(images[0]?.type).toBe("image");
     expect(images[0]?.mimeType).toBe("image/png");
     expect(images[0]?.data).toBe(BASE_IMAGE_PNG);
+  });
+
+  test("agent accepts non-image attachment (e.g. PDF) and forwards in unified attachments", async () => {
+    const pdfB64 = Buffer.from("%PDF-1.4\n").toString("base64");
+    setRegistry(defaultRegistry);
+    await setTestSessionStore({
+      entries: {
+        main: {
+          sessionId: "sess-main-pdf",
+          updatedAt: Date.now(),
+        },
+      },
+    });
+    const res = await rpcReq(ws, "agent", {
+      message: "summarize this document",
+      sessionKey: "main",
+      attachments: [
+        {
+          type: "file",
+          mimeType: "application/pdf",
+          fileName: "doc.pdf",
+          content: pdfB64,
+        },
+      ],
+      idempotencyKey: "idem-agent-pdf",
+    });
+    expect(res.ok).toBe(true);
+
+    const call = latestAgentCall();
+    expect(call.sessionKey).toBe("agent:main:main");
+    expect(typeof call.message).toBe("string");
+    const attachments = call.attachments as Array<Record<string, unknown>> | undefined;
+    expect(Array.isArray(attachments)).toBe(true);
+    expect(attachments?.length).toBe(1);
+    expect(attachments?.[0]?.type).toBe("file");
+    expect(attachments?.[0]?.mimeType).toBe("application/pdf");
+    expect(attachments?.[0]?.fileName).toBe("doc.pdf");
+    expect(attachments?.[0]?.content).toBe(pdfB64);
+    const images = call.images as Array<Record<string, unknown>> | undefined;
+    expect(Array.isArray(images)).toBe(true);
+    expect(images?.length).toBe(0);
+  });
+
+  test("agent returns validation error with reason when attachment exceeds size limit", async () => {
+    const big = "A".repeat(20_000);
+    setRegistry(defaultRegistry);
+    await setTestSessionStore({
+      entries: {
+        main: {
+          sessionId: "sess-main-size",
+          updatedAt: Date.now(),
+        },
+      },
+    });
+    const prevRpcAttachments = testState.gatewayRpcAttachments;
+    testState.gatewayRpcAttachments = { perAttachmentMaxBytes: 100 };
+    try {
+      const res = await rpcReq(ws, "agent", {
+        message: "x",
+        sessionKey: "main",
+        attachments: [
+          {
+            mimeType: "application/pdf",
+            fileName: "big.pdf",
+            content: big,
+          },
+        ],
+        idempotencyKey: "idem-agent-size",
+      });
+      expect(res.ok).toBe(false);
+      expect(res.error?.code).toBe("INVALID_REQUEST");
+      expect(res.error?.message).toMatch(/size limit|exceeds/i);
+      expect(res.error?.details).toBeDefined();
+      expect((res.error?.details as { reason?: string })?.reason).toBe("size_exceeded");
+    } finally {
+      testState.gatewayRpcAttachments = prevRpcAttachments;
+    }
   });
 
   test("agent errors when delivery requested and no last channel exists", async () => {

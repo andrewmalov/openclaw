@@ -171,6 +171,19 @@ describe("gateway server chat", () => {
     };
   };
 
+  test("chat.send without attachments succeeds and response shape unchanged", async () => {
+    await withMainSessionStore(async () => {
+      const res = await rpcReq(ws, "chat.send", {
+        sessionKey: "main",
+        message: "hello",
+        idempotencyKey: "idem-chat-no-attachments",
+      });
+      expect(res.ok).toBe(true);
+      expect(res.payload?.runId).toBeDefined();
+      expect(typeof res.payload?.status).toBe("string");
+    });
+  });
+
   test("sanitizes inbound chat.send message text and rejects null bytes", async () => {
     const nullByteRes = await rpcReq(ws, "chat.send", {
       sessionKey: "main",
@@ -200,6 +213,56 @@ describe("gateway server chat", () => {
     expect(ctx?.Body).toBe("Café\tline");
     expect(ctx?.RawBody).toBe("Café\tline");
     expect(ctx?.BodyForCommands).toBe("Café\tline");
+  });
+
+  test("chat.send accepts non-image attachment (e.g. PDF)", async () => {
+    const pdfB64 = Buffer.from("%PDF-1.4\n").toString("base64");
+    await withMainSessionStore(async () => {
+      const res = await rpcReq(ws, "chat.send", {
+        sessionKey: "main",
+        message: "summarize this",
+        idempotencyKey: "idem-chat-pdf",
+        attachments: [
+          {
+            type: "file",
+            mimeType: "application/pdf",
+            fileName: "doc.pdf",
+            content: pdfB64,
+          },
+        ],
+      });
+      expect(res.ok).toBe(true);
+      expect(res.payload?.runId).toBeDefined();
+    });
+  });
+
+  test("chat.send returns validation error with reason when attachment exceeds size limit", async () => {
+    const big = "A".repeat(20_000);
+    await withMainSessionStore(async () => {
+      const prevRpcAttachments = testState.gatewayRpcAttachments;
+      testState.gatewayRpcAttachments = { perAttachmentMaxBytes: 100 };
+      try {
+        const res = await rpcReq(ws, "chat.send", {
+          sessionKey: "main",
+          message: "x",
+          idempotencyKey: "idem-chat-size",
+          attachments: [
+            {
+              mimeType: "application/pdf",
+              fileName: "big.pdf",
+              content: big,
+            },
+          ],
+        });
+        expect(res.ok).toBe(false);
+        expect((res.error as { code?: string })?.code).toBe("INVALID_REQUEST");
+        expect((res.error as { message?: string })?.message).toMatch(/size limit|exceeds/i);
+        const details = (res.error as { details?: { reason?: string } })?.details;
+        expect(details?.reason).toBe("size_exceeded");
+      } finally {
+        testState.gatewayRpcAttachments = prevRpcAttachments;
+      }
+    });
   });
 
   test("handles chat send and history flows", async () => {
@@ -433,6 +496,29 @@ describe("gateway server chat", () => {
     }
   });
 
+  test("chat.history response shape unchanged for clients that do not read media", async () => {
+    const messages: Array<Record<string, unknown>> = [
+      { role: "user", content: [{ type: "text", text: "hi" }], timestamp: 1 },
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "Hello there." }],
+        timestamp: 2,
+      },
+    ];
+    const historyMessages = await loadChatHistoryWithMessages(messages);
+    expect(historyMessages.length).toBe(2);
+    for (const msg of historyMessages) {
+      const m = msg as Record<string, unknown>;
+      expect(m.role).toBeDefined();
+      expect(typeof m.role).toBe("string");
+    }
+    const assistant = historyMessages[1] as Record<string, unknown>;
+    expect(assistant.role).toBe("assistant");
+    expect(assistant.text).toBeDefined();
+    expect(typeof assistant.text).toBe("string");
+    expect(assistant.content).toBeDefined();
+  });
+
   test("chat.history hides assistant NO_REPLY-only entries", async () => {
     const historyMessages = await loadChatHistoryWithMessages(buildNoReplyHistoryFixture());
     const textValues = collectHistoryTextValues(historyMessages);
@@ -494,6 +580,117 @@ describe("gateway server chat", () => {
       "user:NO_REPLY",
       "assistant:NO_REPLY",
     ]);
+  });
+
+  test("chat.history returns assistant messages with text and media when content has image/file blocks", async () => {
+    const smallPngB64 =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const messages: Array<Record<string, unknown>> = [
+      { role: "user", content: [{ type: "text", text: "hi" }], timestamp: 1 },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "Here is a chart." },
+          {
+            type: "image",
+            source: { type: "base64", media_type: "image/png", data: smallPngB64 },
+          },
+        ],
+        timestamp: 2,
+      },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "And a file." },
+          {
+            type: "file",
+            mimeType: "application/pdf",
+            fileName: "doc.pdf",
+            content: "JVBERi0xLjQKJeLjz9MK",
+          },
+        ],
+        timestamp: 3,
+      },
+    ];
+    const historyMessages = await loadChatHistoryWithMessages(messages);
+    expect(historyMessages.length).toBe(3);
+
+    const assistantWithImage = historyMessages[1] as Record<string, unknown>;
+    expect(assistantWithImage.role).toBe("assistant");
+    expect(typeof assistantWithImage.text).toBe("string");
+    expect((assistantWithImage.text as string).includes("Here is a chart")).toBe(true);
+    const media1 = assistantWithImage.media as Array<{
+      type: string;
+      mimeType?: string;
+      content?: string;
+    }>;
+    expect(Array.isArray(media1)).toBe(true);
+    expect(media1.length).toBe(1);
+    expect(media1[0].type).toBe("image");
+    expect(media1[0].mimeType).toBe("image/png");
+    expect(media1[0].content).toBe(smallPngB64);
+
+    const assistantWithFile = historyMessages[2] as Record<string, unknown>;
+    expect(assistantWithFile.role).toBe("assistant");
+    expect((assistantWithFile.text as string).includes("And a file")).toBe(true);
+    const media2 = assistantWithFile.media as Array<{
+      type: string;
+      mimeType?: string;
+      fileName?: string;
+      content?: string;
+    }>;
+    expect(Array.isArray(media2)).toBe(true);
+    expect(media2.length).toBe(1);
+    expect(media2[0].type).toBe("file");
+    expect(media2[0].mimeType).toBe("application/pdf");
+    expect(media2[0].fileName).toBe("doc.pdf");
+    expect(media2[0].content).toBe("JVBERi0xLjQKJeLjz9MK");
+  });
+
+  test("chat.history returns assistant messages without media when no image/file blocks", async () => {
+    const messages: Array<Record<string, unknown>> = [
+      { role: "user", content: [{ type: "text", text: "hello" }], timestamp: 1 },
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "Just text reply." }],
+        timestamp: 2,
+      },
+    ];
+    const historyMessages = await loadChatHistoryWithMessages(messages);
+    expect(historyMessages.length).toBe(2);
+    const assistant = historyMessages[1] as Record<string, unknown>;
+    expect(assistant.role).toBe("assistant");
+    expect(assistant.text).toBe("Just text reply.");
+    expect(
+      assistant.media === undefined ||
+        (Array.isArray(assistant.media) && assistant.media.length === 0),
+    ).toBe(true);
+  });
+
+  test("chat.history omits media content when over outgoingPerAttachmentMaxBytes", async () => {
+    const prevRpcAttachments = testState.gatewayRpcAttachments;
+    testState.gatewayRpcAttachments = { outgoingPerAttachmentMaxBytes: 2 };
+    try {
+      const messages: Array<Record<string, unknown>> = [
+        { role: "user", content: [{ type: "text", text: "hi" }], timestamp: 1 },
+        {
+          role: "assistant",
+          content: [
+            { type: "text", text: "Big image below." },
+            { type: "image", source: { type: "base64", media_type: "image/png", data: "AAAA" } },
+          ],
+          timestamp: 2,
+        },
+      ];
+      const historyMessages = await loadChatHistoryWithMessages(messages);
+      const assistant = historyMessages[1] as Record<string, unknown>;
+      const media = assistant.media as Array<{ type: string; content?: string }>;
+      expect(media?.length).toBe(1);
+      expect(media[0].type).toBe("image");
+      expect(media[0].content).toBeUndefined();
+    } finally {
+      testState.gatewayRpcAttachments = prevRpcAttachments;
+    }
   });
 
   test("agent.wait resolves chat.send runs that finish without lifecycle events", async () => {

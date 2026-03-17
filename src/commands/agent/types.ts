@@ -31,10 +31,20 @@ export type AgentRunContext = {
   hasRepliedRef?: { value: boolean };
 };
 
+/** Unified attachment (image or non-image) for agent pipeline. */
+export type UnifiedAttachment = {
+  type: string;
+  mimeType?: string;
+  fileName?: string;
+  content: string;
+};
+
 export type AgentCommandOpts = {
   message: string;
   /** Optional image attachments for multimodal messages. */
   images?: ImageContent[];
+  /** Optional unified attachments (image + non-image) for agent pipeline. */
+  attachments?: UnifiedAttachment[];
   /** Optional client-provided tools (OpenResponses hosted tools). */
   clientTools?: ClientToolDefinition[];
   /** Agent id override (must exist in config). */

@@ -71,6 +71,16 @@ export const PollParamsSchema = Type.Object(
   { additionalProperties: false },
 );
 
+/** Single attachment ref (URL); Gateway fetches and passes to agent in same format as inline attachments. */
+export const AttachmentRefItemSchema = Type.Object(
+  {
+    url: Type.String({ minLength: 1 }),
+    mimeType: Type.Optional(Type.String()),
+    fileName: Type.Optional(Type.String()),
+  },
+  { additionalProperties: false },
+);
+
 export const AgentParamsSchema = Type.Object(
   {
     message: NonEmptyString,
@@ -82,6 +92,8 @@ export const AgentParamsSchema = Type.Object(
     thinking: Type.Optional(Type.String()),
     deliver: Type.Optional(Type.Boolean()),
     attachments: Type.Optional(Type.Array(Type.Unknown())),
+    /** Optional refs to files by URL; Gateway fetches and passes to agent in same format as inline attachments. */
+    attachmentRefs: Type.Optional(Type.Array(AttachmentRefItemSchema)),
     channel: Type.Optional(Type.String()),
     replyChannel: Type.Optional(Type.String()),
     accountId: Type.Optional(Type.String()),

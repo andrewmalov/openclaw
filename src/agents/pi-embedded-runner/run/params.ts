@@ -70,6 +70,8 @@ export type RunEmbeddedPiAgentParams = {
   skillsSnapshot?: SkillSnapshot;
   prompt: string;
   images?: ImageContent[];
+  /** Optional unified attachments (image + non-image); non-image are written to workspace for read_file. */
+  attachments?: Array<{ type: string; mimeType?: string; fileName?: string; content: string }>;
   /** Optional client-provided tools (OpenResponses hosted tools). */
   clientTools?: ClientToolDefinition[];
   /** Disable built-in tools for this run (LLM-only mode). */

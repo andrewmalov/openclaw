@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
+import path from "node:path";
 import type { ThinkLevel } from "../../auto-reply/thinking.js";
 import {
   ensureContextEnginesInitialized,
@@ -105,6 +106,46 @@ function scrubAnthropicRefusalMagic(prompt: string): string {
     ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL,
     ANTHROPIC_MAGIC_STRING_REPLACEMENT,
   );
+}
+
+/** Safe filename for inbound attachment: no path separators or control chars. */
+function safeAttachmentBasename(name: string | undefined, idx: number): string {
+  const base = (name ?? `attachment-${idx}`).trim() || `attachment-${idx}`;
+  let noControl = "";
+  for (let i = 0; i < base.length; i++) {
+    const code = base.charCodeAt(i);
+    noControl += code <= 31 || code === 127 ? "_" : base[i];
+  }
+  const noPath = path.basename(noControl).replace(/[/\\<>:"|?*\s]+/g, "_");
+  return noPath.slice(0, 200) || `attachment-${idx}`;
+}
+
+/**
+ * Materialize non-image attachments to workspace and return a prompt prefix listing their paths.
+ * Images are already passed via params.images; only type !== "image" are written for read_file.
+ */
+async function materializeInboundAttachments(
+  workspaceDir: string,
+  runId: string,
+  attachments: Array<{ type: string; mimeType?: string; fileName?: string; content: string }>,
+): Promise<string> {
+  const nonImage = attachments.filter((a) => a.type !== "image");
+  if (nonImage.length === 0) {
+    return "";
+  }
+  const relDir = path.join(".openclaw", "inbound-attachments", runId);
+  const absDir = path.join(workspaceDir, relDir);
+  await fs.mkdir(absDir, { recursive: true });
+  const lines: string[] = ["The following files were attached (use read_file to read them):"];
+  for (let i = 0; i < nonImage.length; i++) {
+    const att = nonImage[i];
+    const name = safeAttachmentBasename(att.fileName, i);
+    const absPath = path.join(absDir, name);
+    const buf = Buffer.from(att.content, "base64");
+    await fs.writeFile(absPath, buf, { mode: 0o644 });
+    lines.push(`- ${path.join(relDir, name)}`);
+  }
+  return lines.join("\n") + "\n\n";
 }
 
 type UsageAccumulator = {
@@ -806,6 +847,8 @@ export async function runEmbeddedPiAgent(
         let authRetryPending = false;
         // Hoisted so the retry-limit error path can use the most recent API total.
         let lastTurnTotal: number | undefined;
+        /** Prompt prefix for materialized non-image attachments (computed once). */
+        let attachmentPromptPrefix: string | null = null;
         while (true) {
           if (runLoopIterations >= MAX_RUN_LOOP_ITERATIONS) {
             const message =
@@ -845,8 +888,18 @@ export async function runEmbeddedPiAgent(
           attemptedThinking.add(thinkLevel);
           await fs.mkdir(resolvedWorkspace, { recursive: true });
 
-          const prompt =
+          if (attachmentPromptPrefix === null) {
+            attachmentPromptPrefix = params.attachments?.length
+              ? await materializeInboundAttachments(
+                  resolvedWorkspace,
+                  params.runId,
+                  params.attachments,
+                )
+              : "";
+          }
+          const basePrompt =
             provider === "anthropic" ? scrubAnthropicRefusalMagic(params.prompt) : params.prompt;
+          const prompt = (attachmentPromptPrefix ?? "") + basePrompt;
 
           const attempt = await runEmbeddedAttempt({
             sessionId: params.sessionId,
