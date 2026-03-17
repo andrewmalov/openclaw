@@ -112,3 +112,4 @@ export {
   isTelegramExecApprovalApprover,
   isTelegramExecApprovalClientEnabled,
 } from "../../extensions/telegram/src/exec-approvals.js";
+export { markdownToTelegramHtml } from "../../extensions/telegram/src/format.js";

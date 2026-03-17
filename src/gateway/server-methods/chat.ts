@@ -18,10 +18,10 @@ import {
 } from "../../config/types.gateway.js";
 import { jsonUtf8Bytes } from "../../infra/json-utf8-bytes.js";
 import { estimateBase64DecodedBytes } from "../../media/base64.js";
+import { markdownToTelegramHtml } from "../../plugin-sdk/telegram.js";
 import { normalizeInputProvenance, type InputProvenance } from "../../sessions/input-provenance.js";
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
 import { parseAgentSessionKey } from "../../sessions/session-key-utils.js";
-import { markdownToTelegramHtml } from "../../telegram/format.js";
 import {
   stripInlineDirectiveTagsForDisplay,
   stripInlineDirectiveTagsFromMessageForDisplay,
