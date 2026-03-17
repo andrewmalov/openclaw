@@ -230,6 +230,8 @@ export const testState = {
   gatewayBind: undefined as "auto" | "lan" | "tailnet" | "loopback" | undefined,
   gatewayAuth: undefined as Record<string, unknown> | undefined,
   gatewayControlUi: undefined as Record<string, unknown> | undefined,
+  /** Override gateway.rpcAttachments for tests (e.g. perAttachmentMaxBytes). */
+  gatewayRpcAttachments: undefined as { perAttachmentMaxBytes?: number } | undefined,
   hooksConfig: undefined as HooksConfig | undefined,
   canvasHostPort: undefined as number | undefined,
   legacyIssues: [] as Array<{ path: string; message: string }>,
@@ -529,8 +531,131 @@ vi.mock("../config/config.js", async () => {
       } catch {
         fileConfig = {};
       }
-      return applyPluginAutoEnable({ config: composeTestConfig(fileConfig), env: process.env })
-        .config;
+      const fileAgents =
+        fileConfig.agents &&
+        typeof fileConfig.agents === "object" &&
+        !Array.isArray(fileConfig.agents)
+          ? (fileConfig.agents as Record<string, unknown>)
+          : {};
+      const fileDefaults =
+        fileAgents.defaults &&
+        typeof fileAgents.defaults === "object" &&
+        !Array.isArray(fileAgents.defaults)
+          ? (fileAgents.defaults as Record<string, unknown>)
+          : {};
+      const defaults = {
+        model: { primary: "anthropic/claude-opus-4-6" },
+        workspace: path.join(os.tmpdir(), "openclaw-gateway-test"),
+        ...fileDefaults,
+        ...testState.agentConfig,
+      };
+      const agents = testState.agentsConfig
+        ? { ...fileAgents, ...testState.agentsConfig, defaults }
+        : { ...fileAgents, defaults };
+
+      const fileBindings = Array.isArray(fileConfig.bindings)
+        ? (fileConfig.bindings as AgentBinding[])
+        : undefined;
+
+      const fileChannels =
+        fileConfig.channels &&
+        typeof fileConfig.channels === "object" &&
+        !Array.isArray(fileConfig.channels)
+          ? ({ ...(fileConfig.channels as Record<string, unknown>) } as Record<string, unknown>)
+          : {};
+      const overrideChannels =
+        testState.channelsConfig && typeof testState.channelsConfig === "object"
+          ? { ...testState.channelsConfig }
+          : {};
+      const mergedChannels = { ...fileChannels, ...overrideChannels };
+      if (testState.allowFrom !== undefined) {
+        const existing =
+          mergedChannels.whatsapp &&
+          typeof mergedChannels.whatsapp === "object" &&
+          !Array.isArray(mergedChannels.whatsapp)
+            ? (mergedChannels.whatsapp as Record<string, unknown>)
+            : {};
+        mergedChannels.whatsapp = {
+          ...existing,
+          allowFrom: testState.allowFrom,
+        };
+      }
+      const channels = Object.keys(mergedChannels).length > 0 ? mergedChannels : undefined;
+
+      const fileSession =
+        fileConfig.session &&
+        typeof fileConfig.session === "object" &&
+        !Array.isArray(fileConfig.session)
+          ? (fileConfig.session as Record<string, unknown>)
+          : {};
+      const session: Record<string, unknown> = {
+        ...fileSession,
+        mainKey: fileSession.mainKey ?? "main",
+      };
+      if (typeof testState.sessionStorePath === "string") {
+        session.store = testState.sessionStorePath;
+      }
+      if (testState.sessionConfig) {
+        Object.assign(session, testState.sessionConfig);
+      }
+
+      const fileGateway =
+        fileConfig.gateway &&
+        typeof fileConfig.gateway === "object" &&
+        !Array.isArray(fileConfig.gateway)
+          ? ({ ...(fileConfig.gateway as Record<string, unknown>) } as Record<string, unknown>)
+          : {};
+      if (testState.gatewayBind) {
+        fileGateway.bind = testState.gatewayBind;
+      }
+      if (testState.gatewayAuth) {
+        fileGateway.auth = testState.gatewayAuth;
+      }
+      if (testState.gatewayControlUi) {
+        fileGateway.controlUi = testState.gatewayControlUi;
+      }
+      if (testState.gatewayRpcAttachments) {
+        fileGateway.rpcAttachments = testState.gatewayRpcAttachments;
+      }
+      const gateway = Object.keys(fileGateway).length > 0 ? fileGateway : undefined;
+
+      const fileCanvasHost =
+        fileConfig.canvasHost &&
+        typeof fileConfig.canvasHost === "object" &&
+        !Array.isArray(fileConfig.canvasHost)
+          ? ({ ...(fileConfig.canvasHost as Record<string, unknown>) } as Record<string, unknown>)
+          : {};
+      if (typeof testState.canvasHostPort === "number") {
+        fileCanvasHost.port = testState.canvasHostPort;
+      }
+      const canvasHost = Object.keys(fileCanvasHost).length > 0 ? fileCanvasHost : undefined;
+
+      const hooks = testState.hooksConfig ?? (fileConfig.hooks as HooksConfig | undefined);
+
+      const fileCron =
+        fileConfig.cron && typeof fileConfig.cron === "object" && !Array.isArray(fileConfig.cron)
+          ? ({ ...(fileConfig.cron as Record<string, unknown>) } as Record<string, unknown>)
+          : {};
+      if (typeof testState.cronEnabled === "boolean") {
+        fileCron.enabled = testState.cronEnabled;
+      }
+      if (typeof testState.cronStorePath === "string") {
+        fileCron.store = testState.cronStorePath;
+      }
+      const cron = Object.keys(fileCron).length > 0 ? fileCron : undefined;
+
+      const config = {
+        ...fileConfig,
+        agents,
+        bindings: testState.bindingsConfig ?? fileBindings,
+        channels,
+        session,
+        gateway,
+        canvasHost,
+        hooks,
+        cron,
+      };
+      return applyPluginAutoEnable({ config, env: process.env }).config;
     },
     parseConfigJson5: (raw: string) => {
       try {

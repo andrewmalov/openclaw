@@ -1,4 +1,5 @@
 import { Type } from "@sinclair/typebox";
+import { AttachmentRefItemSchema } from "./agent.js";
 import { ChatSendSessionKeyString, InputProvenanceSchema, NonEmptyString } from "./primitives.js";
 
 export const LogsTailParamsSchema = Type.Object(
@@ -38,6 +39,8 @@ export const ChatSendParamsSchema = Type.Object(
     thinking: Type.Optional(Type.String()),
     deliver: Type.Optional(Type.Boolean()),
     attachments: Type.Optional(Type.Array(Type.Unknown())),
+    /** Optional refs to files by URL; Gateway fetches and passes in same format as inline attachments. */
+    attachmentRefs: Type.Optional(Type.Array(AttachmentRefItemSchema)),
     timeoutMs: Type.Optional(Type.Integer({ minimum: 0 })),
     systemInputProvenance: Type.Optional(InputProvenanceSchema),
     systemProvenanceReceipt: Type.Optional(Type.String()),

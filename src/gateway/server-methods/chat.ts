@@ -10,11 +10,18 @@ import type { MsgContext } from "../../auto-reply/templating.js";
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../../auto-reply/tokens.js";
 import type { ReplyPayload } from "../../auto-reply/types.js";
 import { createReplyPrefixOptions } from "../../channels/reply-prefix.js";
+import { loadConfig } from "../../config/config.js";
 import { resolveSessionFilePath } from "../../config/sessions.js";
+import {
+  GATEWAY_RPC_ATTACHMENT_DEFAULT_MAX_BYTES,
+  type GatewayRpcAttachmentsConfig,
+} from "../../config/types.gateway.js";
 import { jsonUtf8Bytes } from "../../infra/json-utf8-bytes.js";
+import { estimateBase64DecodedBytes } from "../../media/base64.js";
 import { normalizeInputProvenance, type InputProvenance } from "../../sessions/input-provenance.js";
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
 import { parseAgentSessionKey } from "../../sessions/session-key-utils.js";
+import { markdownToTelegramHtml } from "../../telegram/format.js";
 import {
   stripInlineDirectiveTagsForDisplay,
   stripInlineDirectiveTagsFromMessageForDisplay,
@@ -32,7 +39,11 @@ import {
   isChatStopCommandText,
   resolveChatRunExpiresAtMs,
 } from "../chat-abort.js";
-import { type ChatImageContent, parseMessageWithAttachments } from "../chat-attachments.js";
+import {
+  AttachmentValidationError,
+  type ChatImageContent,
+  parseMessageWithAttachments,
+} from "../chat-attachments.js";
 import { stripEnvelopeFromMessage, stripEnvelopeFromMessages } from "../chat-sanitize.js";
 import { ADMIN_SCOPE } from "../method-scopes.js";
 import {
@@ -473,6 +484,7 @@ function sanitizeChatHistoryMessage(message: unknown): { message: unknown; chang
  * Returns `undefined` for non-assistant messages or messages with no extractable text.
  * When `entry.text` is present it takes precedence over `entry.content` to avoid
  * dropping messages that carry real text alongside a stale `content: "NO_REPLY"`.
+ * Bails on first non-text block (used to detect "all text" vs mixed content).
  */
 function extractAssistantTextForSilentCheck(message: unknown): string | undefined {
   if (!message || typeof message !== "object") {
@@ -506,6 +518,136 @@ function extractAssistantTextForSilentCheck(message: unknown): string | undefine
   return texts.length > 0 ? texts.join("\n") : undefined;
 }
 
+/**
+ * Extract all text from an assistant message (all text blocks joined).
+ * Used for chat.history response text + Telegram HTML; does not bail on non-text blocks.
+ */
+function extractAssistantTextForEnrichment(message: unknown): string {
+  if (!message || typeof message !== "object") {
+    return "";
+  }
+  const entry = message as Record<string, unknown>;
+  if (entry.role !== "assistant") {
+    return "";
+  }
+  if (typeof entry.text === "string") {
+    return entry.text;
+  }
+  if (typeof entry.content === "string") {
+    return entry.content;
+  }
+  if (!Array.isArray(entry.content)) {
+    return "";
+  }
+  const texts: string[] = [];
+  for (const block of entry.content) {
+    if (!block || typeof block !== "object") {
+      continue;
+    }
+    const typed = block as { type?: unknown; text?: unknown };
+    if (typed.type === "text" && typeof typed.text === "string") {
+      texts.push(typed.text);
+    }
+  }
+  return texts.join("\n");
+}
+
+/**
+ * Media item in chat.history assistant message response (contract §4).
+ * type "image" | "file"; content (base64) included when within outgoing size limit.
+ */
+export type ChatHistoryMediaItem = {
+  type: "image" | "file";
+  mimeType?: string;
+  fileName?: string;
+  content?: string;
+};
+
+/**
+ * Enrich assistant messages with `text` (Telegram-compatible HTML) and `media` (from content blocks)
+ * before sanitization strips image/file data. Uses cfg.gateway?.rpcAttachments for outgoing limit.
+ */
+function enrichAssistantMessagesWithTextAndMedia(
+  messages: unknown[],
+  rpcAttachments: GatewayRpcAttachmentsConfig | undefined,
+): unknown[] {
+  const outgoingMaxBytes =
+    rpcAttachments?.outgoingPerAttachmentMaxBytes ?? GATEWAY_RPC_ATTACHMENT_DEFAULT_MAX_BYTES;
+
+  return messages.map((message) => {
+    if (!message || typeof message !== "object") {
+      return message;
+    }
+    const entry = message as Record<string, unknown>;
+    if (entry.role !== "assistant") {
+      return message;
+    }
+
+    const out = { ...entry } as Record<string, unknown>;
+
+    // Text: extract from all text blocks and convert to Telegram HTML
+    const rawText = extractAssistantTextForEnrichment(message);
+    out.text = rawText ? markdownToTelegramHtml(rawText) : "";
+
+    // Media: from content blocks (image/file with base64), respecting outgoing size limit
+    if (!Array.isArray(entry.content)) {
+      return out;
+    }
+    const media: ChatHistoryMediaItem[] = [];
+    for (const block of entry.content) {
+      if (!block || typeof block !== "object") {
+        continue;
+      }
+      const b = block as Record<string, unknown>;
+      const type = b.type;
+      let base64: string | undefined;
+      let mimeType: string | undefined;
+      let fileName: string | undefined;
+      const blockType = typeof type === "string" ? type : "";
+
+      if (blockType === "image") {
+        if (typeof b.data === "string") {
+          base64 = b.data;
+        } else if (
+          b.source &&
+          typeof b.source === "object" &&
+          typeof (b.source as { data?: unknown }).data === "string"
+        ) {
+          const src = b.source as { data: string; media_type?: string };
+          base64 = src.data;
+          mimeType = typeof src.media_type === "string" ? src.media_type : undefined;
+        }
+        if (base64 !== undefined && mimeType === undefined) {
+          mimeType = (b.mimeType as string) ?? "image/png";
+        }
+        fileName = typeof b.fileName === "string" ? b.fileName : undefined;
+      } else if (blockType === "file") {
+        base64 = typeof b.content === "string" ? b.content : undefined;
+        mimeType = typeof b.mimeType === "string" ? b.mimeType : undefined;
+        fileName = typeof b.fileName === "string" ? b.fileName : undefined;
+      }
+
+      if (base64 === undefined) {
+        continue;
+      }
+      const sizeBytes = estimateBase64DecodedBytes(base64);
+      const item: ChatHistoryMediaItem = {
+        type: blockType === "image" ? "image" : "file",
+        ...(mimeType && { mimeType }),
+        ...(fileName && { fileName }),
+      };
+      if (sizeBytes <= outgoingMaxBytes) {
+        item.content = base64;
+      }
+      media.push(item);
+    }
+    if (media.length > 0) {
+      out.media = media;
+    }
+    return out;
+  });
+}
+
 function sanitizeChatHistoryMessages(messages: unknown[]): unknown[] {
   if (messages.length === 0) {
     return messages;
@@ -516,8 +658,12 @@ function sanitizeChatHistoryMessages(messages: unknown[]): unknown[] {
     const res = sanitizeChatHistoryMessage(message);
     changed ||= res.changed;
     // Drop assistant messages whose entire visible text is the silent reply token.
+    // Keep messages that have media (enriched earlier) even if text is only the token.
     const text = extractAssistantTextForSilentCheck(res.message);
-    if (text !== undefined && isSilentReplyText(text, SILENT_REPLY_TOKEN)) {
+    const hasMedia =
+      Array.isArray((res.message as Record<string, unknown>).media) &&
+      ((res.message as Record<string, unknown>).media as unknown[]).length > 0;
+    if (text !== undefined && isSilentReplyText(text, SILENT_REPLY_TOKEN) && !hasMedia) {
       changed = true;
       continue;
     }
@@ -984,7 +1130,11 @@ export const chatHandlers: GatewayRequestHandlers = {
     const max = Math.min(hardMax, requested);
     const sliced = rawMessages.length > max ? rawMessages.slice(-max) : rawMessages;
     const sanitized = stripEnvelopeFromMessages(sliced);
-    const normalized = sanitizeChatHistoryMessages(sanitized);
+    const enriched = enrichAssistantMessagesWithTextAndMedia(
+      sanitized,
+      cfg.gateway?.rpcAttachments,
+    );
+    const normalized = sanitizeChatHistoryMessages(enriched);
     const maxHistoryBytes = getMaxChatHistoryMessagesBytes();
     const perMessageHardCap = Math.min(CHAT_HISTORY_MAX_SINGLE_MESSAGE_BYTES, maxHistoryBytes);
     const replaced = replaceOversizedChatHistoryMessages({
@@ -1172,16 +1322,33 @@ export const chatHandlers: GatewayRequestHandlers = {
     }
     let parsedMessage = inboundMessage;
     let parsedImages: ChatImageContent[] = [];
+    let parsedAttachments: Array<{
+      type: string;
+      mimeType?: string;
+      fileName?: string;
+      content: string;
+    }> = [];
     if (normalizedAttachments.length > 0) {
+      const cfgForAttachments = loadConfig();
+      const rpcAttachments: GatewayRpcAttachmentsConfig | undefined =
+        cfgForAttachments.gateway?.rpcAttachments;
+      const attachmentMaxBytes =
+        rpcAttachments?.perAttachmentMaxBytes ?? GATEWAY_RPC_ATTACHMENT_DEFAULT_MAX_BYTES;
       try {
         const parsed = await parseMessageWithAttachments(inboundMessage, normalizedAttachments, {
-          maxBytes: 5_000_000,
+          maxBytes: attachmentMaxBytes,
           log: context.logGateway,
+          mimeAllowlist: rpcAttachments?.mimeAllowlist,
+          mimeBlocklist: rpcAttachments?.mimeBlocklist,
         });
         parsedMessage = parsed.message;
         parsedImages = parsed.images;
+        parsedAttachments = parsed.attachments;
       } catch (err) {
-        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, String(err)));
+        const msg = err instanceof Error ? err.message : String(err);
+        const details =
+          err instanceof AttachmentValidationError ? { reason: err.reason } : undefined;
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, msg, { details }));
         return;
       }
     }
@@ -1345,6 +1512,7 @@ export const chatHandlers: GatewayRequestHandlers = {
           runId: clientRunId,
           abortSignal: abortController.signal,
           images: parsedImages.length > 0 ? parsedImages : undefined,
+          attachments: parsedAttachments.length > 0 ? parsedAttachments : undefined,
           onAgentRunStart: (runId) => {
             agentRunStarted = true;
             const connId = typeof client?.connId === "string" ? client.connId : undefined;

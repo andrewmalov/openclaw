@@ -390,6 +390,25 @@ export type GatewayToolsConfig = {
   allow?: string[];
 };
 
+/** Default per-attachment size limit for RPC (100 MB decoded). */
+export const GATEWAY_RPC_ATTACHMENT_DEFAULT_MAX_BYTES = 100 * 1024 * 1024;
+
+/** RPC attachment limits and MIME policy for agent/chat.send and chat.history. */
+export type GatewayRpcAttachmentsConfig = {
+  /** Max decoded bytes per attachment (incoming). Default: 100 MB. */
+  perAttachmentMaxBytes?: number;
+  /** Optional max total decoded bytes per request (incoming). When set, enforced. */
+  aggregateMaxBytes?: number;
+  /** Optional max number of attachments per request. When set, enforced. */
+  maxCount?: number;
+  /** Optional MIME allowlist (e.g. ["application/pdf","image/*"]). When set, only these accepted. */
+  mimeAllowlist?: string[];
+  /** Optional MIME blocklist. When set, these are rejected. */
+  mimeBlocklist?: string[];
+  /** Max decoded bytes per attachment for outgoing inline media (chat.history). Default: 100 MB. */
+  outgoingPerAttachmentMaxBytes?: number;
+};
+
 export type GatewayConfig = {
   /** Single multiplexed port for Gateway WS + HTTP (default: 18789). */
   port?: number;
@@ -432,6 +451,8 @@ export type GatewayConfig = {
   allowRealIpFallback?: boolean;
   /** Tool access restrictions for HTTP /tools/invoke endpoint. */
   tools?: GatewayToolsConfig;
+  /** RPC attachment limits and MIME policy (agent, chat.send, chat.history). */
+  rpcAttachments?: GatewayRpcAttachmentsConfig;
   /**
    * Channel health monitor interval in minutes.
    * Periodically checks channel health and restarts unhealthy channels.

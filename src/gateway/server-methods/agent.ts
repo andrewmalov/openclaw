@@ -16,6 +16,10 @@ import {
   type SessionEntry,
   updateSessionStore,
 } from "../../config/sessions.js";
+import {
+  GATEWAY_RPC_ATTACHMENT_DEFAULT_MAX_BYTES,
+  type GatewayRpcAttachmentsConfig,
+} from "../../config/types.gateway.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import {
   resolveAgentDeliveryPlan,
@@ -34,7 +38,7 @@ import {
   normalizeMessageChannel,
 } from "../../utils/message-channel.js";
 import { resolveAssistantIdentity } from "../assistant-identity.js";
-import { parseMessageWithAttachments } from "../chat-attachments.js";
+import { AttachmentValidationError, parseMessageWithAttachments } from "../chat-attachments.js";
 import { resolveAssistantAvatarUrl } from "../control-ui-shared.js";
 import { ADMIN_SCOPE } from "../method-scopes.js";
 import { GATEWAY_CLIENT_CAPS, hasGatewayClientCap } from "../protocol/client-info.js";
@@ -215,18 +219,34 @@ export const agentHandlers: GatewayRequestHandlers = {
     const requestedBestEffortDeliver =
       typeof request.bestEffortDeliver === "boolean" ? request.bestEffortDeliver : undefined;
 
+    const rpcAttachments: GatewayRpcAttachmentsConfig | undefined = cfg.gateway?.rpcAttachments;
+    const attachmentMaxBytes =
+      rpcAttachments?.perAttachmentMaxBytes ?? GATEWAY_RPC_ATTACHMENT_DEFAULT_MAX_BYTES;
+
     let message = (request.message ?? "").trim();
     let images: Array<{ type: "image"; data: string; mimeType: string }> = [];
+    let attachments: Array<{
+      type: string;
+      mimeType?: string;
+      fileName?: string;
+      content: string;
+    }> = [];
     if (normalizedAttachments.length > 0) {
       try {
         const parsed = await parseMessageWithAttachments(message, normalizedAttachments, {
-          maxBytes: 5_000_000,
+          maxBytes: attachmentMaxBytes,
           log: context.logGateway,
+          mimeAllowlist: rpcAttachments?.mimeAllowlist,
+          mimeBlocklist: rpcAttachments?.mimeBlocklist,
         });
         message = parsed.message.trim();
         images = parsed.images;
+        attachments = parsed.attachments;
       } catch (err) {
-        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, String(err)));
+        const msg = err instanceof Error ? err.message : String(err);
+        const details =
+          err instanceof AttachmentValidationError ? { reason: err.reason } : undefined;
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, msg, { details }));
         return;
       }
     }
@@ -584,6 +604,7 @@ export const agentHandlers: GatewayRequestHandlers = {
       ingressOpts: {
         message,
         images,
+        attachments: attachments.length > 0 ? attachments : undefined,
         to: resolvedTo,
         sessionId: resolvedSessionId,
         sessionKey: resolvedSessionKey,
