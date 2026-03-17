@@ -262,6 +262,8 @@ Migration target:
 
 ## Attachments and media (RPC)
 
+For a developer-oriented guide (request/response examples, validation errors, using `chat.history` with media), see [Orchestrator RPC Guide](/gateway/orchestrator-rpc-guide).
+
 - **Inbound** (`agent`, `chat.send`): Params may include an `attachments` array (each item: `type?`, `mimeType?`, `fileName?`, `content` base64). Optional `attachmentRefs` (HTTPS URLs) are planned; Gateway would fetch and merge into the same delivery format. Default per-attachment limit is 100 MB; config keys under `gateway.rpcAttachments` (see [contract in repo](https://github.com/openclaw/openclaw/blob/main/specs/001-gateway-rpc-file-transfer/contracts/gateway-rpc-attachments.md)).
 - **Outbound** (`chat.history`): Assistant messages include `text` (Telegram-compatible HTML) and optional `media` array (`type`, `mimeType?`, `fileName?`, `content?` base64). Outgoing per-attachment size is configurable (default 100 MB). Reply text format matches Telegram `parse_mode: "HTML"` for orchestrator forwarding.
 
