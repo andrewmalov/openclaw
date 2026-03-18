@@ -14,6 +14,46 @@ For handshake, framing, and auth, see [Gateway protocol](/gateway/protocol).
 
 ---
 
+## Required scopes at connect
+
+The Gateway checks **scopes** on every request. If your client does not declare the right scopes in the **`connect`** handshake, you get errors like `missing scope: operator.write`.
+
+When opening the WebSocket connection, send a `connect` request with **`params.scopes`** including at least:
+
+| Scope            | Needed for                                       |
+| ---------------- | ------------------------------------------------ |
+| `operator.write` | `agent`, `chat.send`, `chat.abort`, `agent.wait` |
+| `operator.read`  | `chat.history`, `sessions.list`, `status`, etc.  |
+
+**Example:** minimal scopes for an orchestrator that sends messages and reads history:
+
+```json
+{
+  "type": "req",
+  "id": "connect-1",
+  "method": "connect",
+  "params": {
+    "minProtocol": 3,
+    "maxProtocol": 3,
+    "role": "operator",
+    "scopes": ["operator.read", "operator.write"],
+    "client": { "id": "orchestrator", "version": "1.0.0", "platform": "linux", "mode": "operator" },
+    "auth": { "token": "<your-gateway-token>" },
+    "device": {
+      "id": "<device-id>",
+      "publicKey": "<...>",
+      "signature": "<...>",
+      "signedAt": 1234567890,
+      "nonce": "<challenge-nonce>"
+    }
+  }
+}
+```
+
+If you only send `operator.read`, calls to `agent` or `chat.send` will fail with `missing scope: operator.write`. Add `operator.write` to `scopes` and reconnect.
+
+---
+
 ## Sending messages with attachments
 
 ### Methods: `agent` and `chat.send`
