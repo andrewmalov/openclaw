@@ -2630,6 +2630,18 @@ Limits and MIME policy for `agent` / `chat.send` (inbound) and `chat.history` (o
 | `mimeBlocklist`                 | —       | Optional. These MIME types rejected.                    |
 | `outgoingPerAttachmentMaxBytes` | 100 MB  | Max decoded bytes per attachment in chat.history media. |
 
+### Backend operator scopes without device (`gateway.backendOperatorScopeClientIds`)
+
+When a client connects **without** device identity (no `params.device`), the Gateway does not trust self-declared scopes and clears them for non–Control UI clients. That causes `missing scope: operator.write` (or similar) when the same client later calls `agent`, `chat.send`, or `chat.history`.
+
+To allow a **trusted backend/orchestrator** (e.g. OpenClaw Farm) that authenticates with the same token as the agent and does not send device identity to keep its requested scopes, add that client’s `params.client.id` to this list:
+
+| Key                             | Default | Description                                                             |
+| ------------------------------- | ------- | ----------------------------------------------------------------------- |
+| `backendOperatorScopeClientIds` | `[]`    | Client IDs that may connect as operator without device and keep scopes. |
+
+Example: if the orchestrator sends `client.id: "gateway-client"`, set `gateway.backendOperatorScopeClientIds: ["gateway-client"]` in the agent’s config (e.g. in the pod or `~/.openclaw/openclaw.json`). Only add IDs you trust; the token is still required.
+
 ### Multi-instance isolation
 
 Run multiple gateways on one host with unique ports and state dirs:

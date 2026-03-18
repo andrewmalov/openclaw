@@ -850,6 +850,7 @@ export const OpenClawSchema = z
           })
           .strict()
           .optional(),
+        backendOperatorScopeClientIds: z.array(z.string()).optional(),
       })
       .strict()
       .superRefine((gateway, ctx) => {

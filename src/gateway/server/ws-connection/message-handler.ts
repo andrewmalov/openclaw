@@ -534,7 +534,17 @@ export function attachGatewayWsMessageHandler(params: {
           // Shared token/password auth can bypass pairing for trusted operators, but
           // device-less backend clients must not self-declare scopes. Control UI
           // keeps its explicitly allowed device-less scopes on the allow path.
-          if (!device && (!isControlUi || decision.kind !== "allow")) {
+          // Config gateway.backendOperatorScopeClientIds allows specific client IDs
+          // (e.g. Farm orchestrator) to keep requested scopes when auth is by token.
+          const backendAllowlist = configSnapshot.gateway?.backendOperatorScopeClientIds ?? [];
+          const allowBackendScopes =
+            !device &&
+            role === "operator" &&
+            sharedAuthOk &&
+            backendAllowlist.length > 0 &&
+            typeof connectParams.client?.id === "string" &&
+            backendAllowlist.includes(connectParams.client.id);
+          if (!device && (!isControlUi || decision.kind !== "allow") && !allowBackendScopes) {
             clearUnboundScopes();
           }
           if (decision.kind === "allow") {

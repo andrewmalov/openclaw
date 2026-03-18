@@ -454,6 +454,14 @@ export type GatewayConfig = {
   /** RPC attachment limits and MIME policy (agent, chat.send, chat.history). */
   rpcAttachments?: GatewayRpcAttachmentsConfig;
   /**
+   * Client IDs that may connect as operator without device identity and keep requested scopes.
+   * Use for trusted backend/orchestrator clients (e.g. OpenClaw Farm) that authenticate with
+   * the same token as the agent. When a connect has no device, role=operator, token auth OK,
+   * and connect.params.client.id is in this list, requested scopes are not cleared.
+   * Default: empty (device-less non–Control UI clients get scopes cleared).
+   */
+  backendOperatorScopeClientIds?: string[];
+  /**
    * Channel health monitor interval in minutes.
    * Periodically checks channel health and restarts unhealthy channels.
    * Set to 0 to disable. Default: 5.

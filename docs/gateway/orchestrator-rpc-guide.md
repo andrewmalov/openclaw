@@ -52,6 +52,22 @@ When opening the WebSocket connection, send a `connect` request with **`params.s
 
 If you only send `operator.read`, calls to `agent` or `chat.send` will fail with `missing scope: operator.write`. Add `operator.write` to `scopes` and reconnect.
 
+### Connecting without device identity
+
+If your orchestrator connects **without** sending `params.device` (token-only auth), the Gateway normally **clears** requested scopes for non–Control UI clients. You will see `missing scope: operator.write` on `agent` even though you sent `operator.write` in `connect.params.scopes`.
+
+The deployment must explicitly allow your client ID. In the **agent’s** config (e.g. `~/.openclaw/openclaw.json` or the pod’s config), set:
+
+```json
+{
+  "gateway": {
+    "backendOperatorScopeClientIds": ["gateway-client"]
+  }
+}
+```
+
+Use the same string as your `params.client.id` (e.g. `"gateway-client"`). Only client IDs in this list are allowed to keep requested scopes when connecting without device. See [Configuration Reference — Backend operator scopes](/gateway/configuration-reference#backend-operator-scopes-without-device).
+
 ---
 
 ## Sending messages with attachments

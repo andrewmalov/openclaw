@@ -1,5 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { WebSocket } from "ws";
+import type { OpenClawConfig } from "../config/config.js";
+import {
+  clearConfigCache,
+  loadConfig,
+  readConfigFileSnapshot,
+  writeConfigFile,
+} from "../config/config.js";
 import {
   connectReq,
   ConnectErrorDetailCodes,
@@ -211,6 +218,48 @@ export function registerDefaultAuthTokenSuite(): void {
         await expectStatusMissingScopeButHealthAvailable(ws);
       } finally {
         ws.close();
+      }
+    });
+
+    test("backendOperatorScopeClientIds allows device-less operator to keep requested scopes", async () => {
+      const token = resolveGatewayTokenOrEnv();
+      const snapshot = await readConfigFileSnapshot();
+      const original: OpenClawConfig = snapshot.valid ? snapshot.config : loadConfig();
+      const merged: typeof original = {
+        ...original,
+        gateway: {
+          ...original.gateway,
+          auth: { mode: "token", token },
+          backendOperatorScopeClientIds: ["gateway-client"],
+        },
+      };
+      await writeConfigFile(merged);
+      clearConfigCache();
+      try {
+        const ws = await openWs(port);
+        try {
+          const res = await connectReq(ws, {
+            token,
+            device: null,
+            role: "operator",
+            scopes: ["operator.read", "operator.write"],
+            client: {
+              id: "gateway-client",
+              displayName: "OpenClaw Farm",
+              version: "1",
+              platform: "python",
+              mode: "backend",
+            },
+          });
+          expect(res.ok).toBe(true);
+          const status = await rpcReq(ws, "status");
+          expect(status.ok, status.error?.message ?? "no error message").toBe(true);
+        } finally {
+          ws.close();
+        }
+      } finally {
+        await writeConfigFile(original);
+        clearConfigCache();
       }
     });
 
