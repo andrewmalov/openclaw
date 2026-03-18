@@ -715,10 +715,11 @@ export const agentHandlers: GatewayRequestHandlers = {
     }
     const p = params;
     const runId = (p.runId ?? "").trim();
+    const DEFAULT_AGENT_WAIT_TIMEOUT_MS = 120_000;
     const timeoutMs =
       typeof p.timeoutMs === "number" && Number.isFinite(p.timeoutMs)
         ? Math.max(0, Math.floor(p.timeoutMs))
-        : 30_000;
+        : DEFAULT_AGENT_WAIT_TIMEOUT_MS;
     const hasActiveChatRun = context.chatAbortControllers.has(runId);
 
     const cachedGatewaySnapshot = readTerminalSnapshotFromGatewayDedupe({
@@ -778,6 +779,7 @@ export const agentHandlers: GatewayRequestHandlers = {
       respond(true, {
         runId,
         status: "timeout",
+        error: `Run did not complete within ${Math.round(timeoutMs / 1000)}s. Increase agent.wait params.timeoutMs or check agent run.`,
       });
       return;
     }

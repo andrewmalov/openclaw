@@ -265,6 +265,32 @@ If the Gateway omits **`content`** for an item (e.g. file over the outgoing limi
 
 ---
 
+## Troubleshooting: files not reaching the assistant
+
+If the orchestrator sends `params.attachments` (and optionally `params.message`) but the agent does not see the files:
+
+1. **Path**: Gateway passes `params.attachments` through validation (size, base64, MIME) and forwards them to the agent runtime. The agent receives them as unified attachments (images + non-image files). Non-image files are materialized into the run workspace for tools (e.g. `read_file`).
+
+2. **MIME policy**: By default there is **no** allowlist or blocklist, so types such as `application/pdf`, `audio/ogg`, `image/*` are accepted. If the deployment sets **`gateway.rpcAttachments.mimeAllowlist`**, only those MIME types are allowed; if **`mimeBlocklist`** is set, those types are rejected. Check the agent’s config (e.g. `~/.openclaw/openclaw.json` or pod config) and the [config reference](/gateway/configuration-reference#rpc-attachments-gatewayrpcattachments).
+
+3. **Timeout**: If you only see a timeout (e.g. from `agent.wait`), the run may be slow or stuck. The default wait timeout is **120 s**. Use **`agent.wait`** with **`params.timeoutMs`** (e.g. `120000` or higher) to wait longer. On timeout, the response has `status: "timeout"` and an `error` message; you can show that to users or retry with a larger timeout.
+
+---
+
+## Troubleshooting: assistant cannot send file to the user (orchestrator)
+
+If the assistant generates an image or file but the user never receives it (e.g. they see an apology like “ошибка доступа к Telegram-боту” or only text):
+
+1. **Get media from chat.history**: The assistant’s reply (text + images/files) is returned in **`chat.history`** in the last assistant message: **`message.text`** and **`message.media`**. Call **`chat.history`** after **`agent.wait`** completes so the run’s final reply is in the transcript. Use the **last** assistant message in the slice; its **`media`** array holds the files.
+
+2. **Check `media[].content`**: Each media item has **`type`**, **`mimeType`**, **`fileName`**, and optionally **`content`** (base64). If **`content`** is missing, the file exceeded the Gateway’s **outgoing** size limit (**`gateway.rpcAttachments.outgoingPerAttachmentMaxBytes`**, default 100 MB). Increase that in the agent’s config if you need larger inline files, or handle “no content” in the orchestrator (e.g. show “file too large” or skip).
+
+3. **Orchestrator must send to the channel**: The Gateway does not send to Telegram. The **orchestrator** must take **`message.media`**, decode each item’s **`content`** (base64), and send it to the user (e.g. **Telegram**: `sendPhoto` for `image/*`, `sendDocument` for others). If the user sees “ошибка доступа к Telegram-боту” or similar, the failure is usually on the **orchestrator/Telegram** side (token, permissions, Telegram file/size limits, or network). The Gateway has already returned the media in **chat.history**; ensure the orchestrator (a) reads **message.media**, (b) decodes **content**, and (c) calls the correct Telegram API with the buffer. Log orchestrator send errors to see the real Telegram API error.
+
+4. **Message tool with target webchat (401 Unauthorized)**: If the assistant uses the **message** tool with **target: "webchat"** to send a file (e.g. a generated avatar), the run may previously have failed with “Telegram recipient @webchat could not be resolved … (401: Unauthorized)”. That happened because the session is webchat but the message tool fell back to the configured Telegram channel and tried to resolve “webchat” as a Telegram chat. The agent now receives a **clear error** instead: “Sending to webchat via the message tool is not supported … your reply (including media) is delivered through chat.history”. So the assistant should **not** use the message tool with target webchat; the reply (text and media) is already in **chat.history** and the orchestrator delivers it. No change needed on the orchestrator side; ensure you read **message.media** from the last assistant message and send it to the user.
+
+---
+
 ## Backward compatibility
 
 - **Not sending attachments**: Omit `attachments` or send `[]`. Behavior is unchanged.

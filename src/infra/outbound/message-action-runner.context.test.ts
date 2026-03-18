@@ -186,6 +186,22 @@ describe("runMessageAction context isolation", () => {
     ).rejects.toThrow(/message required/i);
   });
 
+  it("throws when session is webchat and agent uses message tool with target webchat", async () => {
+    const cfg = {
+      channels: { telegram: { botToken: "test" } },
+    } as OpenClawConfig;
+    await expect(
+      runDrySend({
+        cfg,
+        actionParams: {
+          target: "webchat",
+          message: "hi",
+        },
+        toolContext: { currentChannelProvider: "webchat" },
+      }),
+    ).rejects.toThrow(/Sending to webchat via the message tool is not supported/);
+  });
+
   it("allows send when only shared interactive payloads are provided", async () => {
     const result = await runDrySend({
       cfg: {

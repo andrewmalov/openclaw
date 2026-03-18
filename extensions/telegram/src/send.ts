@@ -274,6 +274,12 @@ async function resolveChatId(
   if (!lookupTarget || typeof getChat !== "function") {
     throw new Error("Telegram recipient must be a numeric chat ID");
   }
+  const isWebchatTarget = lookupTarget === "@webchat" || to.trim().toLowerCase() === "webchat";
+  if (isWebchatTarget) {
+    throw new Error(
+      "Target 'webchat' is not a Telegram chat. In webchat/orchestrator sessions your reply (including media) is delivered through chat.history; do not use the message tool with target webchat.",
+    );
+  }
   try {
     const chat = await getChat.call(params.api, lookupTarget);
     const resolved = normalizeTelegramChatId(String(chat?.id ?? ""));

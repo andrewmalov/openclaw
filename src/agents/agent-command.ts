@@ -375,6 +375,7 @@ function runAgentAttempt(params: {
         bootstrapPromptWarningSignaturesSeen,
         bootstrapPromptWarningSignature,
         images: params.isFallbackRetry ? undefined : params.opts.images,
+        attachments: params.isFallbackRetry ? undefined : params.opts.attachments,
         streamParams: params.opts.streamParams,
       });
     return runCliWithSession(cliSessionId).catch(async (err) => {
@@ -479,6 +480,7 @@ function runAgentAttempt(params: {
     skillsSnapshot: params.skillsSnapshot,
     prompt: effectivePrompt,
     images: params.isFallbackRetry ? undefined : params.opts.images,
+    attachments: params.isFallbackRetry ? undefined : params.opts.attachments,
     clientTools: params.opts.clientTools,
     provider: params.providerOverride,
     model: params.modelOverride,

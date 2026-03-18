@@ -20,7 +20,11 @@ import { hasPollCreationParams, resolveTelegramPollVisibility } from "../../poll
 import { resolvePollMaxSelections } from "../../polls.js";
 import { buildChannelAccountBindings } from "../../routing/bindings.js";
 import { normalizeAgentId } from "../../routing/session-key.js";
-import { type GatewayClientMode, type GatewayClientName } from "../../utils/message-channel.js";
+import {
+  INTERNAL_MESSAGE_CHANNEL,
+  type GatewayClientMode,
+  type GatewayClientName,
+} from "../../utils/message-channel.js";
 import { throwIfAborted } from "./abort.js";
 import { resolveOutboundChannelPlugin } from "./channel-resolution.js";
 import {
@@ -745,6 +749,19 @@ export async function runMessageAction(
   });
 
   const channel = await resolveChannel(cfg, params, input.toolContext);
+  // When session is webchat/orchestrator and agent passes target=webchat, do not route to
+  // another channel (e.g. Telegram) with to="webchat" — that causes getChat("webchat") and 401.
+  const toRaw = readStringParam(params, "to", { allowEmpty: true })?.trim().toLowerCase();
+  const sessionIsWebchat = input.toolContext?.currentChannelProvider === INTERNAL_MESSAGE_CHANNEL;
+  if (
+    sessionIsWebchat &&
+    channel !== INTERNAL_MESSAGE_CHANNEL &&
+    (toRaw === "webchat" || toRaw === "@webchat")
+  ) {
+    throw new Error(
+      "Sending to webchat via the message tool is not supported. In webchat/orchestrator sessions your reply (including media) is delivered through chat.history; the client receives it there. Do not use the message tool with target webchat.",
+    );
+  }
   let accountId = readStringParam(params, "accountId") ?? input.defaultAccountId;
   if (!accountId && resolvedAgentId) {
     const byAgent = buildChannelAccountBindings(cfg).get(channel);
