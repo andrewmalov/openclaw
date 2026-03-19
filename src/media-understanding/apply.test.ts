@@ -299,6 +299,45 @@ describe("applyMediaUnderstanding", () => {
     expect((ctx as unknown as { BodyForAgent?: string }).BodyForAgent).toBe(ctx.Body);
   });
 
+  it("auto audio mode falls back to next provider when first provider fetch fails", async () => {
+    const emptyBinDir = await createTempMediaDir();
+    const isolatedAgentDir = await createTempMediaDir();
+    const ctx = await createAudioCtx({ mediaType: "audio/ogg", fileName: "voice.oga" });
+    const cfg: OpenClawConfig = {
+      tools: { media: { audio: { enabled: true } } },
+    };
+    const providers = {
+      openai: {
+        id: "openai",
+        transcribeAudio: async () => {
+          throw new TypeError("fetch failed");
+        },
+      },
+      groq: {
+        id: "groq",
+        transcribeAudio: async () => ({ text: "fallback transcript ok" }),
+      },
+    };
+
+    await withMediaAutoDetectEnv(
+      {
+        PATH: emptyBinDir,
+        OPENCLAW_AGENT_DIR: isolatedAgentDir,
+        PI_CODING_AGENT_DIR: isolatedAgentDir,
+      },
+      async () => {
+        const result = await applyMediaUnderstanding({ ctx, cfg, providers });
+        expect(result.appliedAudio).toBe(true);
+        expect(ctx.Transcript).toBe("fallback transcript ok");
+        const audioDecision = result.decisions.find((entry) => entry.capability === "audio");
+        expect(audioDecision).toBeDefined();
+        const attempts = audioDecision?.attachments?.[0]?.attempts ?? [];
+        expect(attempts.some((attempt) => attempt.outcome === "failed")).toBe(true);
+        expect(attempts.some((attempt) => attempt.outcome === "success")).toBe(true);
+      },
+    );
+  });
+
   it("skips file blocks for text-like audio when transcription succeeds", async () => {
     const ctx = await createAudioCtx({
       fileName: "data.mp3",

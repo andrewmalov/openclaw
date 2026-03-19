@@ -152,7 +152,9 @@ async function materializeInboundAttachments(
     const absPath = path.join(absDir, name);
     const buf = Buffer.from(att.content, "base64");
     await fs.writeFile(absPath, buf, { mode: 0o644 });
-    lines.push(`- ${path.join(relDir, name)}`);
+    // Use absolute paths so the model does not misresolve relative paths against
+    // an arbitrary process cwd (for example `/app` instead of the workspace root).
+    lines.push(`- ${absPath}`);
   }
   return lines.join("\n") + "\n\n";
 }

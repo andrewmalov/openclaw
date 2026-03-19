@@ -511,21 +511,32 @@ export async function runProviderEntry(params: {
     const result = await executeWithApiKeyRotation({
       provider: providerId,
       apiKeys,
-      execute: async (apiKey) =>
-        transcribeAudio({
-          buffer: media.buffer,
-          fileName: media.fileName,
-          mime: media.mime,
-          apiKey,
-          baseUrl,
-          headers,
-          model,
-          language: entry.language ?? params.config?.language ?? cfg.tools?.media?.audio?.language,
-          prompt,
-          query: providerQuery,
-          timeoutMs,
-          fetchFn,
-        }),
+      execute: async (apiKey) => {
+        try {
+          return await transcribeAudio({
+            buffer: media.buffer,
+            fileName: media.fileName,
+            mime: media.mime,
+            apiKey,
+            baseUrl,
+            headers,
+            model,
+            language:
+              entry.language ?? params.config?.language ?? cfg.tools?.media?.audio?.language,
+            prompt,
+            query: providerQuery,
+            timeoutMs,
+            fetchFn,
+          });
+        } catch (err) {
+          const detail = err instanceof Error ? err.message : String(err);
+          throw new Error(
+            `Audio transcription failed (provider=${providerId}, model=${model ?? "-"}, mime=${media.mime ?? "-"}, file=${media.fileName ?? "-"})` +
+              `: ${detail}`,
+            { cause: err },
+          );
+        }
+      },
     });
     return {
       kind: "audio.transcription",

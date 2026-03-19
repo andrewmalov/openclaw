@@ -758,8 +758,42 @@ export async function runMessageAction(
     channel !== INTERNAL_MESSAGE_CHANNEL &&
     (toRaw === "webchat" || toRaw === "@webchat")
   ) {
+    if (action === "send") {
+      const mediaUrl =
+        readStringParam(params, "media", { trim: false }) ??
+        readStringParam(params, "path", { trim: false }) ??
+        readStringParam(params, "filePath", { trim: false });
+      const mediaUrls = Array.isArray(params.mediaUrls)
+        ? params.mediaUrls.filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+        : undefined;
+      const message = readStringParam(params, "message", { allowEmpty: true }) ?? "";
+      if (mediaUrl || (mediaUrls && mediaUrls.length > 0)) {
+        const payload = {
+          channel,
+          to: "webchat",
+          via: "direct" as const,
+          mediaUrl: mediaUrl ?? null,
+          ...(mediaUrls && mediaUrls.length > 0 ? { mediaUrls } : {}),
+          inlineRelay: true,
+          note: "Webchat inline relay: media returned to orchestrator via reply payload.",
+        };
+        return {
+          kind: "send",
+          channel,
+          action: "send",
+          to: "webchat",
+          handledBy: "core",
+          payload: {
+            ...payload,
+            ...(message.trim() ? { message } : {}),
+          },
+          sendResult: payload,
+          dryRun: Boolean(input.dryRun ?? readBooleanParam(params, "dryRun")),
+        };
+      }
+    }
     throw new Error(
-      "Sending to webchat via the message tool is not supported. In webchat/orchestrator sessions your reply (including media) is delivered through chat.history; the client receives it there. Do not use the message tool with target webchat.",
+      "Sending to webchat via the message tool is not supported for text-only sends. In webchat/orchestrator sessions, send text as a normal assistant reply; media/file sends may use message tool target=webchat for inline relay.",
     );
   }
   let accountId = readStringParam(params, "accountId") ?? input.defaultAccountId;

@@ -186,7 +186,28 @@ describe("runMessageAction context isolation", () => {
     ).rejects.toThrow(/message required/i);
   });
 
-  it("throws when session is webchat and agent uses message tool with target webchat", async () => {
+  it("relays media inline when session is webchat and target is webchat", async () => {
+    const cfg = {
+      channels: { telegram: { botToken: "test" } },
+    } as OpenClawConfig;
+    const result = await runDrySend({
+      cfg,
+      actionParams: {
+        target: "webchat",
+        filePath: "/app/workspace/report.md",
+        message: "report",
+      },
+      toolContext: { currentChannelProvider: "webchat" },
+    });
+    expect(result.kind).toBe("send");
+    expect(result.payload).toMatchObject({
+      to: "webchat",
+      mediaUrl: "/app/workspace/report.md",
+      inlineRelay: true,
+    });
+  });
+
+  it("keeps text-only webchat message tool sends blocked", async () => {
     const cfg = {
       channels: { telegram: { botToken: "test" } },
     } as OpenClawConfig;
@@ -199,7 +220,7 @@ describe("runMessageAction context isolation", () => {
         },
         toolContext: { currentChannelProvider: "webchat" },
       }),
-    ).rejects.toThrow(/Sending to webchat via the message tool is not supported/);
+    ).rejects.toThrow(/text-only sends/);
   });
 
   it("allows send when only shared interactive payloads are provided", async () => {

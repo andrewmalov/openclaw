@@ -344,6 +344,7 @@ async function resolveKeyEntry(params: {
   providerRegistry: ProviderRegistry;
   capability: MediaUnderstandingCapability;
   activeModel?: ActiveMediaModel;
+  allCandidates?: boolean;
 }): Promise<MediaUnderstandingModelConfig | null> {
   const { cfg, agentDir, providerRegistry, capability } = params;
   const checkProvider = async (
@@ -417,13 +418,71 @@ async function resolveKeyEntry(params: {
       return activeEntry;
     }
   }
+  const audioEntries: MediaUnderstandingModelConfig[] = [];
   for (const providerId of AUTO_AUDIO_KEY_PROVIDERS) {
     const entry = await checkProvider(providerId, undefined);
-    if (entry) {
-      return entry;
+    if (!entry) {
+      continue;
     }
+    if (params.allCandidates === true) {
+      audioEntries.push(entry);
+      continue;
+    }
+    return entry;
+  }
+  if (params.allCandidates === true) {
+    return audioEntries[0] ?? null;
   }
   return null;
+}
+
+async function resolveAllAudioKeyEntries(params: {
+  cfg: OpenClawConfig;
+  agentDir?: string;
+  providerRegistry: ProviderRegistry;
+  activeModel?: ActiveMediaModel;
+}): Promise<MediaUnderstandingModelConfig[]> {
+  const entries: MediaUnderstandingModelConfig[] = [];
+  const seenProviders = new Set<string>();
+  const pushEntry = (entry: MediaUnderstandingModelConfig | null) => {
+    if (!entry || entry.type !== "provider") {
+      return;
+    }
+    const providerId = normalizeMediaProviderId(entry.provider);
+    if (seenProviders.has(providerId)) {
+      return;
+    }
+    seenProviders.add(providerId);
+    entries.push(entry);
+  };
+
+  // Keep active provider first so users still get expected preference, but
+  // allow fallback to other authenticated providers when the first one has
+  // transient network/API issues (e.g. undici "fetch failed").
+  const activeProvider = params.activeModel?.provider?.trim();
+  if (activeProvider) {
+    const activeEntry = await resolveKeyEntry({
+      cfg: params.cfg,
+      agentDir: params.agentDir,
+      providerRegistry: params.providerRegistry,
+      capability: "audio",
+      activeModel: params.activeModel,
+    });
+    pushEntry(activeEntry);
+  }
+
+  for (const providerId of AUTO_AUDIO_KEY_PROVIDERS) {
+    const entry = await resolveKeyEntry({
+      cfg: params.cfg,
+      agentDir: params.agentDir,
+      providerRegistry: params.providerRegistry,
+      capability: "audio",
+      activeModel: { provider: providerId },
+    });
+    pushEntry(entry);
+  }
+
+  return entries;
 }
 
 function resolveImageModelFromAgentDefaults(cfg: OpenClawConfig): MediaUnderstandingModelConfig[] {
@@ -481,6 +540,17 @@ async function resolveAutoEntries(params: {
   const gemini = await resolveGeminiCliEntry(params.capability);
   if (gemini) {
     return [gemini];
+  }
+  if (params.capability === "audio") {
+    const audioEntries = await resolveAllAudioKeyEntries({
+      cfg: params.cfg,
+      agentDir: params.agentDir,
+      providerRegistry: params.providerRegistry,
+      activeModel: params.activeModel,
+    });
+    if (audioEntries.length > 0) {
+      return audioEntries;
+    }
   }
   const keys = await resolveKeyEntry(params);
   if (keys) {
