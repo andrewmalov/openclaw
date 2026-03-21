@@ -6,6 +6,7 @@ import { WebSocket } from "ws";
 import { emitAgentEvent, registerAgentRunContext } from "../infra/agent-events.js";
 import { extractFirstTextBlock } from "../shared/chat-message-content.js";
 import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../utils/message-channel.js";
+import { storeSessionRunMedia, clearSessionRunMedia } from "./session-run-media-store.js";
 import {
   connectOk,
   getReplyFromConfig,
@@ -818,6 +819,53 @@ describe("gateway server chat", () => {
     } finally {
       testState.gatewayRpcAttachments = prevRpcAttachments;
     }
+  });
+
+  test("chat.history injects message-tool inline relay media into last assistant message", async () => {
+    const pdfB64 = "JVBERi0xLjQKJeLjz9MK";
+    const messages: Array<Record<string, unknown>> = [
+      { role: "user", content: [{ type: "text", text: "send a file" }], timestamp: 1 },
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "Here is the document." }],
+        timestamp: 2,
+      },
+    ];
+    await withMainSessionStore(async (dir) => {
+      const mediaPath = path.join(dir, "message-tool-sent.pdf");
+      await fs.writeFile(mediaPath, Buffer.from(pdfB64, "base64"));
+
+      const lines = messages.map((message) => JSON.stringify({ message }));
+      await fs.writeFile(path.join(dir, "sess-main.jsonl"), lines.join("\n"), "utf-8");
+
+      storeSessionRunMedia("main", "run-msg-tool-1", [mediaPath]);
+      try {
+        const res = await rpcReq<{ messages?: unknown[] }>(ws, "chat.history", {
+          sessionKey: "main",
+        });
+        expect(res.ok).toBe(true);
+        const historyMessages = res.payload?.messages ?? [];
+        expect(historyMessages.length).toBe(2);
+
+        const lastAssistant = historyMessages[1] as Record<string, unknown>;
+        expect(lastAssistant.role).toBe("assistant");
+        expect((lastAssistant.text as string).includes("Here is the document")).toBe(true);
+        const media = lastAssistant.media as Array<{
+          type: string;
+          mimeType?: string;
+          fileName?: string;
+          content?: string;
+        }>;
+        expect(Array.isArray(media)).toBe(true);
+        expect(media.length).toBe(1);
+        expect(media[0].type).toBe("file");
+        expect(media[0].mimeType).toBe("application/pdf");
+        expect(media[0].fileName).toBe("message-tool-sent.pdf");
+        expect(media[0].content).toBe(pdfB64);
+      } finally {
+        clearSessionRunMedia("main");
+      }
+    });
   });
 
   test("agent.wait resolves chat.send runs that finish without lifecycle events", async () => {

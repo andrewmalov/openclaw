@@ -78,7 +78,18 @@
 - [x] T016 [US2] Add config for outgoing inline per-attachment size limit (default 100 MB) and optional aggregate/count; enforce when building media in response
 - [x] T017 [US2] Add tests in `src/gateway/server-methods/chat.test.ts` or `src/gateway/server.chat.gateway-server-chat*.test.ts` for chat.history returning messages with media (content base64) and for messages without media (unchanged shape)
 
-**Checkpoint**: User Story 2 complete — orchestrator receives files inline in chat.history
+### Message tool inline relay → chat.history media (gap)
+
+**Goal**: When the agent uses `message(send, target=webchat, filePath=...)`, the inline relay returns `mediaUrl` in the tool result; this must reach `chat.history.media` so the orchestrator receives the file inline.
+
+**Independent Test**: Agent calls message tool with target=webchat and filePath; request chat.history; verify the last assistant message includes media with content (base64) from that file.
+
+- [x] T017a [US2] In `src/agents/pi-embedded-subscribe.handlers.tools.ts`: extend `collectMessagingMediaUrlsFromRecord` (or `collectMessagingMediaUrlsFromToolResult`) to extract `mediaUrl`/`mediaUrls` from `sendResult` when present, so message tool inline relay result (with `sendResult: { mediaUrl, mediaUrls }`) populates `messagingToolSentMediaUrls`
+- [x] T017b [US2] Persist `messagingToolSentMediaUrls` for completed runs so chat.history can read them: extend transcript format or add run metadata store (e.g. session sidecar or in-memory cache keyed by runId) in `src/gateway/` or `src/config/sessions/`; write when run completes
+- [x] T017c [US2] In `src/gateway/server-methods/chat.ts`: when building chat.history, load persisted messagingToolSentMediaUrls for the session’s recent run(s); in `enrichAssistantMessagesWithTextAndMedia` (or a new helper), for the last assistant message, read files at those paths, base64-encode, and append to `media[]`; respect `outgoingPerAttachmentMaxBytes`
+- [x] T017d [US2] Add test in `src/gateway/server.chat.gateway-server-chat*.test.ts` for message tool with target=webchat + filePath producing media in chat.history
+
+**Checkpoint**: User Story 2 complete — orchestrator receives files inline in chat.history (including from message tool)
 
 ---
 
@@ -150,6 +161,7 @@
 - T001, T002, T003 can run in parallel (Phase 1).
 - T008–T012 (US1) can be partially parallel (different files) after T004–T007.
 - T013–T017 (US2): T013 can be [P]; T014–T017 are sequential within US2.
+- T017a–T017d (US2 inline relay): T017a first (extract mediaUrl from tool result); T017b (persist); T017c (inject into chat.history); T017d (test).
 - T018–T020 (US4): T018 and T019/T020 can be parallel.
 - T021–T025 (US3): T021, T022, T024 can be [P]; T023, T025 depend on fetch and schema.
 
@@ -185,7 +197,7 @@ T012: chat.send tests
 
 1. Setup + Foundational → foundation ready.
 2. US1 → test independently → MVP (send arbitrary files).
-3. US2 → test independently → bidirectional files (receive in history).
+3. US2 → test independently → bidirectional files (receive in history); **T017a–T017d** close the message tool inline relay gap (webchat media in chat.history).
 4. US4 → compat + docs → safe adoption.
 5. US3 → attachmentRefs → optional large-file path.
 6. Polish → optional RPC, logging, full suite.

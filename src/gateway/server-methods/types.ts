@@ -88,6 +88,8 @@ export type GatewayRequestContext = {
     prompter: import("../../wizard/prompts.js").WizardPrompter,
   ) => Promise<void>;
   broadcastVoiceWakeChanged: (triggers: string[]) => void;
+  storeSessionRunMedia: (sessionKey: string, runId: string, mediaUrls: string[]) => void;
+  getSessionRunMedia: (sessionKey: string) => { runId: string; mediaUrls: string[] } | undefined;
 };
 
 export type GatewayRequestOptions = {

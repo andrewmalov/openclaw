@@ -64,6 +64,13 @@ export type GetReplyOptions = {
   /** Called when the actual model is selected (including after fallback).
    * Use this to get model/provider/thinkLevel for responsePrefix template interpolation. */
   onModelSelected?: (ctx: ModelSelectedContext) => void;
+  /** Called when an agent run completes with its result. Used by Gateway to persist
+   * messagingToolSentMediaUrls for chat.history media injection (message tool inline relay). */
+  onRunComplete?: (result: {
+    runId: string;
+    sessionKey?: string;
+    messagingToolSentMediaUrls?: string[];
+  }) => void;
   disableBlockStreaming?: boolean;
   /** Timeout for block reply delivery (ms). */
   blockReplyTimeoutMs?: number;

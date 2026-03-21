@@ -407,6 +407,12 @@ export async function runReplyAgent(params: {
 
     const payloadArray = runResult.payloads ?? [];
 
+    opts?.onRunComplete?.({
+      runId,
+      sessionKey,
+      messagingToolSentMediaUrls: runResult.messagingToolSentMediaUrls,
+    });
+
     if (blockReplyPipeline) {
       await blockReplyPipeline.flush({ force: true });
       blockReplyPipeline.stop();

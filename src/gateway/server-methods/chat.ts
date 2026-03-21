@@ -564,6 +564,46 @@ export type ChatHistoryMediaItem = {
 };
 
 /**
+ * Read file at path, return base64 and inferred type (image/file) for chat.history media.
+ * Returns undefined on read failure; caller should skip and log.
+ */
+async function readFileAsMediaItem(
+  filePath: string,
+  outgoingMaxBytes: number,
+): Promise<ChatHistoryMediaItem | undefined> {
+  try {
+    const buffer = await fs.promises.readFile(filePath);
+    const base64 = buffer.toString("base64");
+    const sizeBytes = buffer.length;
+    const ext = path.extname(filePath).toLowerCase();
+    const isImage = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic", ".heif"].includes(ext);
+    const mimeType =
+      ext === ".png"
+        ? "image/png"
+        : ext === ".jpg" || ext === ".jpeg"
+          ? "image/jpeg"
+          : ext === ".gif"
+            ? "image/gif"
+            : ext === ".webp"
+              ? "image/webp"
+              : ext === ".pdf"
+                ? "application/pdf"
+                : undefined;
+    const item: ChatHistoryMediaItem = {
+      type: isImage ? "image" : "file",
+      ...(mimeType && { mimeType }),
+      fileName: path.basename(filePath),
+    };
+    if (sizeBytes <= outgoingMaxBytes) {
+      item.content = base64;
+    }
+    return item;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Enrich assistant messages with `text` (Telegram-compatible HTML) and `media` (from content blocks)
  * before sanitization strips image/file data. Uses cfg.gateway?.rpcAttachments for outgoing limit.
  */
@@ -646,6 +686,63 @@ function enrichAssistantMessagesWithTextAndMedia(
     }
     return out;
   });
+}
+
+/**
+ * Inject media from message tool inline relay (messagingToolSentMediaUrls) into the last
+ * assistant message. Reads files at paths, base64-encodes, and appends to media[].
+ */
+async function injectMessageToolMediaIntoLastAssistantMessage(
+  messages: unknown[],
+  sessionKey: string,
+  context: Pick<GatewayRequestContext, "getSessionRunMedia" | "logGateway">,
+  rpcAttachments: GatewayRpcAttachmentsConfig | undefined,
+): Promise<unknown[]> {
+  const entry = context.getSessionRunMedia(sessionKey);
+  if (!entry || entry.mediaUrls.length === 0) {
+    return messages;
+  }
+  const outgoingMaxBytes =
+    rpcAttachments?.outgoingPerAttachmentMaxBytes ?? GATEWAY_RPC_ATTACHMENT_DEFAULT_MAX_BYTES;
+
+  // Find last assistant message index
+  let lastAssistantIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m && typeof m === "object" && (m as Record<string, unknown>).role === "assistant") {
+      lastAssistantIdx = i;
+      break;
+    }
+  }
+  if (lastAssistantIdx < 0) {
+    return messages;
+  }
+
+  const extraMedia: ChatHistoryMediaItem[] = [];
+  for (const mediaPath of entry.mediaUrls) {
+    const item = await readFileAsMediaItem(mediaPath, outgoingMaxBytes);
+    if (item) {
+      extraMedia.push(item);
+    } else {
+      context.logGateway.debug(
+        `chat.history: could not read message-tool media at ${mediaPath} (skipped)`,
+      );
+    }
+  }
+  if (extraMedia.length === 0) {
+    return messages;
+  }
+
+  const copy = [...messages];
+  const lastMsg = copy[lastAssistantIdx];
+  if (!lastMsg || typeof lastMsg !== "object") {
+    return messages;
+  }
+  const out = { ...lastMsg } as Record<string, unknown>;
+  const existing = Array.isArray(out.media) ? (out.media as ChatHistoryMediaItem[]) : [];
+  out.media = [...existing, ...extraMedia];
+  copy[lastAssistantIdx] = out;
+  return copy;
 }
 
 function sanitizeChatHistoryMessages(messages: unknown[]): unknown[] {
@@ -1130,8 +1227,11 @@ export const chatHandlers: GatewayRequestHandlers = {
     const max = Math.min(hardMax, requested);
     const sliced = rawMessages.length > max ? rawMessages.slice(-max) : rawMessages;
     const sanitized = stripEnvelopeFromMessages(sliced);
-    const enriched = enrichAssistantMessagesWithTextAndMedia(
-      sanitized,
+    let enriched = enrichAssistantMessagesWithTextAndMedia(sanitized, cfg.gateway?.rpcAttachments);
+    enriched = await injectMessageToolMediaIntoLastAssistantMessage(
+      enriched,
+      sessionKey,
+      context,
       cfg.gateway?.rpcAttachments,
     );
     const normalized = sanitizeChatHistoryMessages(enriched);
@@ -1533,6 +1633,19 @@ export const chatHandlers: GatewayRequestHandlers = {
             }
           },
           onModelSelected,
+          onRunComplete: (result) => {
+            if (
+              result.sessionKey &&
+              result.messagingToolSentMediaUrls &&
+              result.messagingToolSentMediaUrls.length > 0
+            ) {
+              context.storeSessionRunMedia(
+                result.sessionKey,
+                result.runId,
+                result.messagingToolSentMediaUrls,
+              );
+            }
+          },
         },
       })
         .then(() => {

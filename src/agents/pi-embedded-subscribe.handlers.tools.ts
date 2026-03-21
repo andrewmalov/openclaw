@@ -128,7 +128,10 @@ function collectMessagingMediaUrlsFromToolResult(result: unknown): string[] {
 
   appendFromRecord(result);
   if (result && typeof result === "object") {
-    appendFromRecord((result as Record<string, unknown>).details);
+    const rec = result as Record<string, unknown>;
+    appendFromRecord(rec.details);
+    // Message tool inline relay returns sendResult: { mediaUrl, mediaUrls } — must extract for chat.history.media.
+    appendFromRecord(rec.sendResult);
   }
 
   const outputText = extractToolResultText(result);
