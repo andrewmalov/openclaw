@@ -293,6 +293,74 @@ If the assistant generates an image or file but the user never receives it (e.g.
 
 ---
 
+## Example agent configuration for webchat and file transfer
+
+Use this config (or merge into your existing `~/.openclaw/openclaw.json` or pod config) when the agent runs in webchat/orchestrator sessions and needs to send or receive files.
+
+```json
+{
+  "gateway": {
+    "backendOperatorScopeClientIds": ["orchestrator", "gateway-client"],
+    "rpcAttachments": {
+      "perAttachmentMaxBytes": 104857600,
+      "outgoingPerAttachmentMaxBytes": 104857600
+    }
+  },
+  "agents": {
+    "defaults": {
+      "extraSystemPrompt": "When in webchat/orchestrator sessions, use message tool with target=\"webchat\" (not \"current\") for file/media sends. Text-only replies go as normal assistant messages."
+    }
+  },
+  "tools": {
+    "sessions_spawn": {
+      "attachments": {
+        "enabled": true
+      }
+    }
+  },
+  "channels": {
+    "telegram": {
+      "botToken": "<your-telegram-bot-token>"
+    }
+  }
+}
+```
+
+### Key sections
+
+| Section                                    | Purpose                                                                                                                          |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `gateway.backendOperatorScopeClientIds`    | Allow orchestrator to connect without device identity. Use the same strings as `params.client.id` in your `connect` request.     |
+| `gateway.rpcAttachments`                   | Incoming/outgoing file size limits (bytes). Default 100 MB each. Adjust if you need larger files.                                |
+| `agents.defaults.extraSystemPrompt`        | Instructs the model to use `target="webchat"` for file sends in webchat sessions, avoiding 401 when only Telegram is configured. |
+| `tools.sessions_spawn.attachments.enabled` | Lets subagents receive file attachments. Optional; only needed if you spawn subagents with files.                                |
+| `channels.telegram`                        | Required if the orchestrator forwards replies to Telegram. Omit if you only use webchat.                                         |
+
+### Minimal config (webchat-only, no Telegram)
+
+If the agent talks only via webchat and the orchestrator does not send to Telegram:
+
+```json
+{
+  "gateway": {
+    "backendOperatorScopeClientIds": ["orchestrator"],
+    "rpcAttachments": {
+      "perAttachmentMaxBytes": 52428800,
+      "outgoingPerAttachmentMaxBytes": 52428800
+    }
+  },
+  "agents": {
+    "defaults": {
+      "extraSystemPrompt": "In webchat sessions, use message tool target=\"webchat\" for file/media sends."
+    }
+  }
+}
+```
+
+(50 MB limits; no Telegram channel.)
+
+---
+
 ## Backward compatibility
 
 - **Not sending attachments**: Omit `attachments` or send `[]`. Behavior is unchanged.
