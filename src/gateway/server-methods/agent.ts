@@ -106,6 +106,19 @@ function dispatchAgentRunFromGateway(params: {
 }) {
   void agentCommandFromIngress(params.ingressOpts, defaultRuntime, params.context.deps)
     .then((result) => {
+      // Persist message-tool inline relay media for chat.history (orchestrator flow).
+      const sessionKey = params.ingressOpts.sessionKey;
+      if (
+        sessionKey &&
+        result?.messagingToolSentMediaUrls &&
+        result.messagingToolSentMediaUrls.length > 0
+      ) {
+        params.context.storeSessionRunMedia(
+          sessionKey,
+          params.runId,
+          result.messagingToolSentMediaUrls,
+        );
+      }
       const payload = {
         runId: params.runId,
         status: "ok" as const,
