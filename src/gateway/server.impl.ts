@@ -112,7 +112,11 @@ import {
 import { resolveHookClientIpConfig } from "./server/hooks.js";
 import { createReadinessChecker } from "./server/readiness.js";
 import { loadGatewayTlsRuntime } from "./server/tls.js";
-import { getSessionRunMedia, storeSessionRunMedia } from "./session-run-media-store.js";
+import {
+  clearSessionRunMedia,
+  getSessionRunMedia,
+  storeSessionRunMedia,
+} from "./session-run-media-store.js";
 import {
   ensureGatewayStartupAuth,
   mergeGatewayAuthConfig,
@@ -927,6 +931,7 @@ export async function startGatewayServer(
     broadcastVoiceWakeChanged,
     storeSessionRunMedia,
     getSessionRunMedia,
+    clearSessionRunMedia,
   };
 
   // Store the gateway context as a fallback for plugin subagent dispatch

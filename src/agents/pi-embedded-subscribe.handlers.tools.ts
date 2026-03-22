@@ -506,10 +506,17 @@ export async function handleToolExecutionEnd(
     pendingMediaUrls.length > 0 ||
     (isMessagingTool(toolName) && isMessagingToolSendAction(toolName, startArgs));
   if (!isToolError && isMessagingSend) {
-    const committedMediaUrls = [
-      ...pendingMediaUrls,
-      ...collectMessagingMediaUrlsFromToolResult(result),
-    ];
+    const resultUrls = collectMessagingMediaUrlsFromToolResult(result);
+    // Deduplicate across pending (args) and result (sendResult) to avoid sending the
+    // same URL twice when sendResult.mediaUrl is already in pendingMediaUrls.
+    const seen = new Set<string>();
+    const committedMediaUrls: string[] = [];
+    for (const url of [...pendingMediaUrls, ...resultUrls]) {
+      if (!seen.has(url)) {
+        seen.add(url);
+        committedMediaUrls.push(url);
+      }
+    }
     if (committedMediaUrls.length > 0) {
       ctx.state.messagingToolSentMediaUrls.push(...committedMediaUrls);
       ctx.trimMessagingToolSent();

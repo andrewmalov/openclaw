@@ -90,6 +90,7 @@ export type GatewayRequestContext = {
   broadcastVoiceWakeChanged: (triggers: string[]) => void;
   storeSessionRunMedia: (sessionKey: string, runId: string, mediaUrls: string[]) => void;
   getSessionRunMedia: (sessionKey: string) => { runId: string; mediaUrls: string[] } | undefined;
+  clearSessionRunMedia: (sessionKey: string) => void;
 };
 
 export type GatewayRequestOptions = {

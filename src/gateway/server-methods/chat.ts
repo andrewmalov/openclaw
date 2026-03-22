@@ -695,7 +695,10 @@ function enrichAssistantMessagesWithTextAndMedia(
 async function injectMessageToolMediaIntoLastAssistantMessage(
   messages: unknown[],
   sessionKey: string,
-  context: Pick<GatewayRequestContext, "getSessionRunMedia" | "logGateway">,
+  context: Pick<
+    GatewayRequestContext,
+    "getSessionRunMedia" | "clearSessionRunMedia" | "logGateway"
+  >,
   rpcAttachments: GatewayRpcAttachmentsConfig | undefined,
 ): Promise<unknown[]> {
   const entry = context.getSessionRunMedia(sessionKey);
@@ -742,6 +745,11 @@ async function injectMessageToolMediaIntoLastAssistantMessage(
   const existing = Array.isArray(out.media) ? (out.media as ChatHistoryMediaItem[]) : [];
   out.media = [...existing, ...extraMedia];
   copy[lastAssistantIdx] = out;
+
+  // Clear the store entry after injection so repeated chat.history calls don't re-inject
+  // the same media into every subsequent message (would cause duplicates and size bloat).
+  context.clearSessionRunMedia(sessionKey);
+
   return copy;
 }
 

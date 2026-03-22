@@ -933,17 +933,14 @@ export function createMessageTool(options?: MessageToolOptions): AnyAgentTool {
       }
       // Inline relay (send → core → kind=send with sendResult): expose sendResult at
       // root level so collectMessagingMediaUrlsFromToolResult can find mediaUrl/mediaUrls.
+      // Do NOT copy mediaUrl into mediaUrls here — collectMessagingMediaUrlsFromRecord reads
+      // both fields and deduplicates internally; adding mediaUrl to mediaUrls would double-count.
       if (result.kind === "send" && result.sendResult) {
         const payload = result.payload as Record<string, unknown>;
-        const mediaUrls = Array.isArray(result.sendResult.mediaUrls)
-          ? result.sendResult.mediaUrls
-          : result.sendResult.mediaUrl
-            ? [result.sendResult.mediaUrl]
-            : undefined;
         return {
           content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
           details: payload,
-          sendResult: { ...result.sendResult, ...(mediaUrls ? { mediaUrls } : {}) },
+          sendResult: result.sendResult,
         };
       }
       return jsonResult(result.payload);
