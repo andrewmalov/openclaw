@@ -9,8 +9,8 @@ Providers:
 - **Plivo** (Voice API + XML transfer + GetInput speech)
 - **Mock** (dev/no network)
 
-Docs: `https://docs.openclaw.ai/plugins/voice-call`
-Plugin system: `https://docs.openclaw.ai/plugin`
+Docs: `https://github.com/andrewmalov/openclaw`
+Plugin system: `https://github.com/andrewmalov/openclaw`
 
 ## Install (local dev)
 
@@ -89,18 +89,18 @@ Notes:
 - Twilio/Telnyx/Plivo require a **publicly reachable** webhook URL.
 - `mock` is a local dev provider (no network calls).
 - Telnyx requires `telnyx.publicKey` (or `TELNYX_PUBLIC_KEY`) unless `skipSignatureVerification` is true.
-- advanced webhook, streaming, and tunnel notes: `https://docs.openclaw.ai/plugins/voice-call`
+- advanced webhook, streaming, and tunnel notes: `https://github.com/andrewmalov/openclaw`
 
 ## Stale call reaper
 
 See the plugin docs for recommended ranges and production examples:
-`https://docs.openclaw.ai/plugins/voice-call#stale-call-reaper`
+`https://github.com/andrewmalov/openclaw`
 
 ## TTS for calls
 
 Voice Call uses the core `messages.tts` configuration for
 streaming speech on calls. Override examples and provider caveats live here:
-`https://docs.openclaw.ai/plugins/voice-call#tts-for-calls`
+`https://github.com/andrewmalov/openclaw`
 
 ## CLI
 

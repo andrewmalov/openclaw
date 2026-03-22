@@ -1417,7 +1417,7 @@ describe("registerSlackInteractionEvents", () => {
               url_block: {
                 url_input: {
                   type: "url_text_input",
-                  value: "https://docs.openclaw.ai",
+                  value: "https://github.com/andrewmalov/openclaw",
                 },
               },
               richtext_block: {
@@ -1513,7 +1513,7 @@ describe("registerSlackInteractionEvents", () => {
         expect.objectContaining({
           actionId: "url_input",
           inputKind: "url",
-          inputUrl: "https://docs.openclaw.ai/",
+          inputUrl: "https://github.com/andrewmalov/openclaw",
         }),
         expect.objectContaining({
           actionId: "richtext_input",

@@ -41,6 +41,8 @@ const buildInfo = {
   version,
   commit,
   builtAt: new Date().toISOString(),
+  index: "hobot",
+  hobotVersion: "0.1",
 };
 
 fs.mkdirSync(distDir, { recursive: true });

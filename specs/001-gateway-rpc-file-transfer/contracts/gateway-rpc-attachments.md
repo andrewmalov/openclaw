@@ -60,6 +60,7 @@ This document describes the Gateway WebSocket RPC contract for file attachments 
 ### 4.2 Inline delivery (default)
 
 - Files produced by the agent are included in the RPC response: Gateway reads local file (or agent output) and sets `media[].content` (base64). No separate GET required.
+- **Message tool inline relay**: When the agent uses `message(send, target=webchat, filePath=...)`, the message tool returns a result with `mediaUrl` (local path) and `inlineRelay: true`. The Gateway MUST read those files, convert to base64, and inject them into the assistant message `media[]` so they appear in chat.history. Without this, the orchestrator would not receive the file (tool result is not part of assistant content).
 - **Limits**: Per-attachment size configurable (default **100 MB** via `outgoingPerAttachmentMaxBytes`). Optional aggregate/count when configured.
 
 ### 4.3 Optional: mediaUrl and chat.attachments.get

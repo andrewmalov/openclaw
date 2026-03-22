@@ -1,6 +1,6 @@
 import { formatTerminalLink } from "../utils.js";
 
-export const DOCS_ROOT = "https://docs.openclaw.ai";
+export const DOCS_ROOT = "https://github.com/andrewmalov/openclaw";
 
 export function formatDocsLink(
   path: string,
@@ -8,9 +8,12 @@ export function formatDocsLink(
   opts?: { fallback?: string; force?: boolean },
 ): string {
   const trimmed = path.trim();
-  const url = trimmed.startsWith("http")
-    ? trimmed
-    : `${DOCS_ROOT}${trimmed.startsWith("/") ? trimmed : `/${trimmed}`}`;
+  let url: string;
+  if (trimmed.startsWith("http")) {
+    url = trimmed.startsWith("https://docs.openclaw.ai") ? DOCS_ROOT : trimmed;
+  } else {
+    url = DOCS_ROOT;
+  }
   return formatTerminalLink(label ?? url, url, {
     fallback: opts?.fallback ?? url,
     force: opts?.force,

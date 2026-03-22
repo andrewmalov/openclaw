@@ -1,6 +1,6 @@
 # Repository Guidelines
 
-- Repo: https://github.com/openclaw/openclaw
+- Repo: https://github.com/andrewmalov/openclaw
 - In chat replies, file references must be repo-root relative only (example: `extensions/bluebubbles/src/channel.ts:80`); never absolute paths or `~/...`.
 - GitHub issues/comments/PR comments: use literal multiline strings or `-F - <<'EOF'` (or $'...') for real newlines; never embed "\\n".
 - GitHub comment footgun: never use `gh issue/pr comment -b "..."` when body contains backticks or shell chars. Always use single-quoted heredoc (`-F - <<'EOF'`) so no command substitution/escaping corruption.
@@ -57,15 +57,15 @@
 
 ## Docs Linking (Mintlify)
 
-- Docs are hosted on Mintlify (docs.openclaw.ai).
+- Docs are hosted on Github (github.com/andrewmalov/openclaw).
 - Internal doc links in `docs/**/*.md`: root-relative, no `.md`/`.mdx` (example: `[Config](/configuration)`).
 - When working with documentation, read the mintlify skill.
 - For docs, UI copy, and picker lists, order services/providers alphabetically unless the section is explicitly describing runtime behavior (for example auto-detection or execution order).
 - Section cross-references: use anchors on root-relative paths (example: `[Hooks](/configuration#hooks)`).
 - Doc headings and anchors: avoid em dashes and apostrophes in headings because they break Mintlify anchor links.
-- When Peter asks for links, reply with full `https://docs.openclaw.ai/...` URLs (not root-relative).
-- When you touch docs, end the reply with the `https://docs.openclaw.ai/...` URLs you referenced.
-- README (GitHub): keep absolute docs URLs (`https://docs.openclaw.ai/...`) so links work on GitHub.
+- When User asks for links, reply with full `https://github.com/andrewmalov/openclaw` URLs (not root-relative).
+- When you touch docs, end the reply with the `https://github.com/andrewmalov/openclaw` URLs you referenced.
+- README (GitHub): keep absolute docs URLs (`https://github.com/andrewmalov/openclaw`) so links work on GitHub.
 - Docs content must be generic: no personal device names/hostnames/paths; use placeholders like `user@gateway-host` and “gateway host”.
 
 ## Docs i18n (zh-CN)

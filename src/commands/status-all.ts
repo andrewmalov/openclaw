@@ -27,7 +27,7 @@ import { normalizeUpdateChannel, resolveUpdateChannelDisplay } from "../infra/up
 import { checkUpdateStatus, formatGitInstallLabel } from "../infra/update-check.js";
 import { runExec } from "../process/exec.js";
 import type { RuntimeEnv } from "../runtime.js";
-import { VERSION } from "../version.js";
+import { DISPLAY_VERSION } from "../version.js";
 import { resolveControlUiLinks } from "./onboard-helpers.js";
 import { getAgentLocalStatuses } from "./status-all/agents.js";
 import { buildChannelsTable } from "./status-all/channels.js";
@@ -276,7 +276,7 @@ export async function statusAllCommand(
     ).length;
 
     const overviewRows = [
-      { Item: "Version", Value: VERSION },
+      { Item: "Version", Value: DISPLAY_VERSION },
       { Item: "OS", Value: osSummary.label },
       { Item: "Node", Value: process.versions.node },
       {

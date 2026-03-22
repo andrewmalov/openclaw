@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   VERSION,
+  getDisplayVersion,
   readVersionFromBuildInfoForModuleUrl,
   readVersionFromPackageJsonForModuleUrl,
   resolveBinaryVersion,
@@ -72,6 +73,28 @@ describe("version resolution", () => {
       expect(readVersionFromPackageJsonForModuleUrl(moduleUrl)).toBeNull();
       expect(readVersionFromBuildInfoForModuleUrl(moduleUrl)).toBe("4.5.6");
       expect(resolveVersionFromModuleUrl(moduleUrl)).toBe("4.5.6");
+    });
+  });
+
+  it("getDisplayVersion appends hobot index and version when present in build-info", async () => {
+    await withTempDir(async (root) => {
+      await writeJsonFixture(root, "package.json", { name: "openclaw", version: "1.2.3" });
+      await writeJsonFixture(root, "dist/build-info.json", {
+        version: "1.2.3",
+        index: "hobot",
+        hobotVersion: "0.1",
+      });
+      const moduleUrl = await ensureModuleFixture(root);
+      expect(getDisplayVersion(moduleUrl)).toBe("1.2.3 (hobot 0.1)");
+    });
+  });
+
+  it("getDisplayVersion returns base version when build-info lacks index/hobotVersion", async () => {
+    await withTempDir(async (root) => {
+      await writeJsonFixture(root, "package.json", { name: "openclaw", version: "1.2.3" });
+      await writeJsonFixture(root, "dist/build-info.json", { version: "1.2.3" });
+      const moduleUrl = await ensureModuleFixture(root);
+      expect(getDisplayVersion(moduleUrl)).toBe("1.2.3");
     });
   });
 

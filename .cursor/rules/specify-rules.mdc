@@ -1,0 +1,43 @@
+---
+description: Project Development Guidelines
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# openclaw-base Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2026-03-22
+
+## Active Technologies
+- TypeScript (ESM), Node 22+ + Existing provider runtime in `src/plugins/*`, model/provider config types in `src/config/*`, onboarding auth flow in `src/commands/*`, plugin-sdk provider contracts, existing OpenAI-compatible provider patterns (OpenRouter, custom, onboarding LiteLLM defaults) (002-litellm-proxy-provider)
+- Existing OpenClaw config + auth profile storage; no new database (002-litellm-proxy-provider)
+- TypeScript (ESM), Node 22+ + Existing Gateway stack (WebSocket, Pi session transcripts, config), `src/media` (base64, MIME), `src/web/media` (loadWebMedia for URL fetch if attachmentRefs), `src/telegram/format` (HTML for reply text), `src/infra/outbound/message-action-runner` (message tool inline relay with mediaUrl) (001-gateway-rpc-file-transfer)
+- Session transcripts (JSONL) under configured store path; no new DB. Outgoing inline files are read from agent output paths or existing reply payload and embedded in RPC response. (001-gateway-rpc-file-transfer)
+- TypeScript (ESM), Node 22+ + Existing Gateway + agent stack; `src/infra/outbound/channel-selection.ts`, `src/infra/outbound/message-action-runner.ts`, `src/infra/outbound/channel-resolution.ts`, `src/agents/tools/message-tool.ts`, `src/utils/message-channel.ts` (`INTERNAL_MESSAGE_CHANNEL`, `listGatewayMessageChannels`) (003-webchat-default-priority)
+- No new persistence; session/transcript behavior unchanged except successful delivery paths. (003-webchat-default-priority)
+
+- TypeScript (ESM), Node 22+ + Existing Gateway stack (WebSocket, Pi session transcripts, config), `src/media` (base64, MIME), `src/web/media` (loadWebMedia for URL fetch if attachmentRefs), `src/telegram/format` (HTML for reply text) (001-gateway-rpc-file-transfer)
+
+## Project Structure
+
+```text
+src/
+tests/
+```
+
+## Commands
+
+npm test && npm run lint
+
+## Code Style
+
+TypeScript (ESM), Node 22+: Follow standard conventions
+
+## Recent Changes
+- 003-webchat-default-priority: Added TypeScript (ESM), Node 22+ + Existing Gateway + agent stack; `src/infra/outbound/channel-selection.ts`, `src/infra/outbound/message-action-runner.ts`, `src/infra/outbound/channel-resolution.ts`, `src/agents/tools/message-tool.ts`, `src/utils/message-channel.ts` (`INTERNAL_MESSAGE_CHANNEL`, `listGatewayMessageChannels`)
+- 001-gateway-rpc-file-transfer: Added TypeScript (ESM), Node 22+ + Existing Gateway stack (WebSocket, Pi session transcripts, config), `src/media` (base64, MIME), `src/web/media` (loadWebMedia for URL fetch if attachmentRefs), `src/telegram/format` (HTML for reply text), `src/infra/outbound/message-action-runner` (message tool inline relay with mediaUrl)
+- 002-litellm-proxy-provider: Added TypeScript (ESM), Node 22+ + Existing provider runtime in `src/plugins/*`, model/provider config types in `src/config/*`, onboarding auth flow in `src/commands/*`, plugin-sdk provider contracts, existing OpenAI-compatible provider patterns (OpenRouter, custom, onboarding LiteLLM defaults)
+
+
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->

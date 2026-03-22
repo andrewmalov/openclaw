@@ -177,7 +177,7 @@ export async function setupSearch(
     [
       "Web search lets your agent look things up online.",
       "Choose a provider and paste your API key.",
-      "Docs: https://docs.openclaw.ai/tools/web",
+      "Docs: https://github.com/andrewmalov/openclaw",
     ].join("\n"),
     "Web search",
   );
@@ -244,7 +244,7 @@ export async function setupSearch(
         "Secret references enabled — OpenClaw will store a reference instead of the API key.",
         `Env var: ${ref.id}${envAvailable ? " (detected)" : ""}.`,
         ...(envAvailable ? [] : [`Set ${ref.id} in the Gateway environment.`]),
-        "Docs: https://docs.openclaw.ai/tools/web",
+        "Docs: https://github.com/andrewmalov/openclaw",
       ].join("\n"),
       "Web search",
     );
@@ -278,7 +278,7 @@ export async function setupSearch(
     [
       "No API key stored — web_search won't work until a key is available.",
       `Get your key at: ${entry.signupUrl}`,
-      "Docs: https://docs.openclaw.ai/tools/web",
+      "Docs: https://github.com/andrewmalov/openclaw",
     ].join("\n"),
     "Web search",
   );

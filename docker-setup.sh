@@ -489,7 +489,7 @@ echo "Telegram (bot token):"
 echo "  ${COMPOSE_HINT} run --rm openclaw-cli channels add --channel telegram --token <token>"
 echo "Discord (bot token):"
 echo "  ${COMPOSE_HINT} run --rm openclaw-cli channels add --channel discord --token <token>"
-echo "Docs: https://docs.openclaw.ai/channels"
+echo "Docs: https://github.com/andrewmalov/openclaw"
 
 echo ""
 echo "==> Starting gateway"
@@ -573,7 +573,7 @@ if [[ -n "$SANDBOX_ENABLED" ]]; then
 
   if [[ "$sandbox_config_ok" == true ]]; then
     echo "Sandbox enabled: mode=non-main, scope=agent, workspaceAccess=none"
-    echo "Docs: https://docs.openclaw.ai/gateway/sandboxing"
+    echo "Docs: https://github.com/andrewmalov/openclaw"
     # Restart gateway with sandbox compose overlay to pick up socket mount + config.
     docker compose "${COMPOSE_ARGS[@]}" up -d openclaw-gateway
   else

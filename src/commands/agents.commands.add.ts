@@ -335,7 +335,7 @@ export async function agentsAddCommand(
         await prompter.note(
           [
             "Routing unchanged. Add bindings when you're ready.",
-            "Docs: https://docs.openclaw.ai/concepts/multi-agent",
+            "Docs: https://github.com/andrewmalov/openclaw",
           ].join("\n"),
           "Routing",
         );

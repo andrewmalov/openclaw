@@ -82,7 +82,7 @@ export function registerDirectoryCli(program: Command) {
           ],
         ])}\n\n${theme.muted("Docs:")} ${formatDocsLink(
           "/cli/directory",
-          "docs.openclaw.ai/cli/directory",
+          "github.com/andrewmalov/openclaw/cli/directory",
         )}\n`,
     )
     .action(() => {

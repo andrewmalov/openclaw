@@ -233,7 +233,7 @@ describe("resolveOpenClawMetadata", () => {
     const content = `---
 name: session-memory
 description: "Save session context to memory when /new or /reset command is issued"
-homepage: https://docs.openclaw.ai/automation/hooks#session-memory
+homepage: https://github.com/andrewmalov/openclaw
 metadata:
   {
     "openclaw":

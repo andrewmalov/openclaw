@@ -4,6 +4,7 @@ const resolveCliChannelOptionsMock = vi.fn(() => ["telegram", "whatsapp"]);
 
 vi.mock("../../version.js", () => ({
   VERSION: "9.9.9-test",
+  DISPLAY_VERSION: "9.9.9-test",
 }));
 
 vi.mock("../channel-options.js", () => ({

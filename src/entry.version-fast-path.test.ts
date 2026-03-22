@@ -54,6 +54,7 @@ vi.mock("./process/child-process-bridge.js", () => ({
 
 vi.mock("./version.js", () => ({
   VERSION: "9.9.9-test",
+  DISPLAY_VERSION: "9.9.9-test",
 }));
 
 describe("entry root version fast path", () => {

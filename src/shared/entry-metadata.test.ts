@@ -26,11 +26,11 @@ describe("shared/entry-metadata", () => {
   it("falls back through frontmatter homepage aliases and drops blanks", () => {
     expect(
       resolveEmojiAndHomepage({
-        frontmatter: { emoji: "🙂", website: " https://docs.openclaw.ai " },
+        frontmatter: { emoji: "🙂", website: " https://github.com/andrewmalov/openclaw " },
       }),
     ).toEqual({
       emoji: "🙂",
-      homepage: "https://docs.openclaw.ai",
+      homepage: "https://github.com/andrewmalov/openclaw",
     });
     expect(
       resolveEmojiAndHomepage({
@@ -52,7 +52,7 @@ describe("shared/entry-metadata", () => {
       resolveEmojiAndHomepage({
         frontmatter: {
           homepage: " ",
-          website: "https://docs.openclaw.ai",
+          website: "https://github.com/andrewmalov/openclaw",
           url: "https://openclaw.ai/install",
         },
       }),

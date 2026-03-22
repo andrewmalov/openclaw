@@ -64,6 +64,44 @@ export function readVersionFromBuildInfoForModuleUrl(moduleUrl: string): string 
   return readVersionFromJsonCandidates(moduleUrl, BUILD_INFO_CANDIDATES);
 }
 
+type BuildInfoExtra = { index?: string; hobotVersion?: string } | null;
+
+function readBuildInfoExtraForModuleUrl(moduleUrl: string): BuildInfoExtra {
+  try {
+    const require = createRequire(moduleUrl);
+    for (const candidate of BUILD_INFO_CANDIDATES) {
+      try {
+        const parsed = require(candidate) as { index?: string; hobotVersion?: string };
+        const index = parsed.index?.trim();
+        const hobotVersion = parsed.hobotVersion?.trim();
+        if (index && hobotVersion) {
+          return { index, hobotVersion };
+        }
+        return null;
+      } catch {
+        // ignore missing or unreadable candidate
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** User-facing version string; includes hobot index/version when present in build-info. */
+export function getDisplayVersion(moduleUrl: string = import.meta.url): string {
+  const base = resolveBinaryVersion({
+    moduleUrl,
+    injectedVersion: typeof __OPENCLAW_VERSION__ === "string" ? __OPENCLAW_VERSION__ : undefined,
+    bundledVersion: process.env.OPENCLAW_BUNDLED_VERSION,
+  });
+  const extra = readBuildInfoExtraForModuleUrl(moduleUrl);
+  if (extra?.index && extra?.hobotVersion) {
+    return `${base} (${extra.index} ${extra.hobotVersion})`;
+  }
+  return base;
+}
+
 export function resolveVersionFromModuleUrl(moduleUrl: string): string | null {
   return (
     readVersionFromPackageJsonForModuleUrl(moduleUrl) ||
@@ -126,3 +164,6 @@ export const VERSION = resolveBinaryVersion({
   injectedVersion: typeof __OPENCLAW_VERSION__ === "string" ? __OPENCLAW_VERSION__ : undefined,
   bundledVersion: process.env.OPENCLAW_BUNDLED_VERSION,
 });
+
+/** User-facing version string; includes hobot index/version when present in build-info. */
+export const DISPLAY_VERSION = getDisplayVersion();

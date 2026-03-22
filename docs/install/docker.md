@@ -174,7 +174,7 @@ and points at the pinned multi-arch manifest list for that tag):
 - `org.opencontainers.image.base.digest=sha256:3a09aa6354567619221ef6c45a5051b671f953f0a1924d1f819ffb236e520e6b`
 - `org.opencontainers.image.source=https://github.com/openclaw/openclaw`
 - `org.opencontainers.image.url=https://openclaw.ai`
-- `org.opencontainers.image.documentation=https://docs.openclaw.ai/install/docker`
+- `org.opencontainers.image.documentation=https://github.com/andrewmalov/openclaw`
 - `org.opencontainers.image.licenses=MIT`
 - `org.opencontainers.image.title=OpenClaw`
 - `org.opencontainers.image.description=OpenClaw gateway and CLI runtime container image`

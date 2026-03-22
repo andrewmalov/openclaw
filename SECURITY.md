@@ -213,7 +213,7 @@ Security boundary notes:
 
 For threat model + hardening guidance (including `openclaw security audit --deep` and `--fix`), see:
 
-- `https://docs.openclaw.ai/gateway/security`
+- `https://github.com/andrewmalov/openclaw`
 
 ### Tool filesystem hardening
 

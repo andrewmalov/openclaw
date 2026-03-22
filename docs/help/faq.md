@@ -23,7 +23,7 @@ Quick answers plus deeper troubleshooting for real-world setups (local dev, VPS,
   - [It is stuck on "wake up my friend" / onboarding will not hatch. What now?](#it-is-stuck-on-wake-up-my-friend-onboarding-will-not-hatch-what-now)
   - [Can I migrate my setup to a new machine (Mac mini) without redoing onboarding?](#can-i-migrate-my-setup-to-a-new-machine-mac-mini-without-redoing-onboarding)
   - [Where do I see what is new in the latest version?](#where-do-i-see-what-is-new-in-the-latest-version)
-  - [I can't access docs.openclaw.ai (SSL error). What now?](#i-cant-access-docsopenclawai-ssl-error-what-now)
+  - [I can't access github.com/andrewmalov/openclaw (SSL error). What now?](#i-cant-access-githubcomandrewmalovopenclaw-ssl-error-what-now)
   - [What's the difference between stable and beta?](#whats-the-difference-between-stable-and-beta)
   - [How do I install the beta version, and what's the difference between beta and dev?](#how-do-i-install-the-beta-version-and-whats-the-difference-between-beta-and-dev)
   - [How do I try the latest bits?](#how-do-i-try-the-latest-bits)
@@ -445,10 +445,10 @@ Newest entries are at the top. If the top section is marked **Unreleased**, the 
 section is the latest shipped version. Entries are grouped by **Highlights**, **Changes**, and
 **Fixes** (plus docs/other sections when needed).
 
-### I can't access docs.openclaw.ai SSL error What now
+### I can't access github.com/andrewmalov/openclaw SSL error What now
 
-Some Comcast/Xfinity connections incorrectly block `docs.openclaw.ai` via Xfinity
-Advanced Security. Disable it or allowlist `docs.openclaw.ai`, then retry. More
+Some Comcast/Xfinity connections incorrectly block `github.com/andrewmalov/openclaw` via Xfinity
+Advanced Security. Disable it or allowlist `github.com/andrewmalov/openclaw`, then retry. More
 detail: [Troubleshooting](/help/troubleshooting#docsopenclawai-shows-an-ssl-error-comcastxfinity).
 Please help us unblock it by reporting here: [https://spa.xfinity.com/check_url_status](https://spa.xfinity.com/check_url_status).
 

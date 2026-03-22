@@ -59,7 +59,7 @@ export default definePluginEntry({
         envVars: ["XAI_API_KEY"],
         placeholder: "xai-...",
         signupUrl: "https://console.x.ai/",
-        docsUrl: "https://docs.openclaw.ai/tools/web",
+        docsUrl: "https://github.com/andrewmalov/openclaw",
         autoDetectOrder: 30,
         getCredentialValue: (searchConfig) => getScopedCredentialValue(searchConfig, "grok"),
         setCredentialValue: (searchConfigTarget, value) =>

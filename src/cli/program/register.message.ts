@@ -46,7 +46,7 @@ ${formatHelpExamples([
   ],
 ])}
 
-${theme.muted("Docs:")} ${formatDocsLink("/cli/message", "docs.openclaw.ai/cli/message")}`,
+${theme.muted("Docs:")} ${formatDocsLink("/cli/message", "github.com/andrewmalov/openclaw/cli/message")}`,
     )
     .action(() => {
       message.help({ error: true });

@@ -61,7 +61,7 @@ export default definePluginEntry({
         envVars: ["GEMINI_API_KEY"],
         placeholder: "AIza...",
         signupUrl: "https://aistudio.google.com/apikey",
-        docsUrl: "https://docs.openclaw.ai/tools/web",
+        docsUrl: "https://github.com/andrewmalov/openclaw",
         autoDetectOrder: 20,
         getCredentialValue: (searchConfig) => getScopedCredentialValue(searchConfig, "gemini"),
         setCredentialValue: (searchConfigTarget, value) =>

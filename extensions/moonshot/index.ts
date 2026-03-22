@@ -99,7 +99,7 @@ export default definePluginEntry({
         envVars: ["KIMI_API_KEY", "MOONSHOT_API_KEY"],
         placeholder: "sk-...",
         signupUrl: "https://platform.moonshot.cn/",
-        docsUrl: "https://docs.openclaw.ai/tools/web",
+        docsUrl: "https://github.com/andrewmalov/openclaw",
         autoDetectOrder: 40,
         getCredentialValue: (searchConfig) => getScopedCredentialValue(searchConfig, "kimi"),
         setCredentialValue: (searchConfigTarget, value) =>
