@@ -22,7 +22,7 @@ import { normalizeTargetForProvider } from "../../infra/outbound/target-normaliz
 import { POLL_CREATION_PARAM_DEFS, POLL_CREATION_PARAM_NAMES } from "../../poll-params.js";
 import { normalizeAccountId } from "../../routing/session-key.js";
 import { stripReasoningTagsFromText } from "../../shared/text/reasoning-tags.js";
-import { normalizeMessageChannel } from "../../utils/message-channel.js";
+import { isInternalMessageChannel, normalizeMessageChannel } from "../../utils/message-channel.js";
 import { resolveSessionAgentId } from "../agent-scope.js";
 import { listChannelSupportedActions } from "../channel-tools.js";
 import { channelTargetSchema, channelTargetsSchema, stringEnum } from "../schema/typebox.js";
@@ -738,6 +738,9 @@ function buildMessageToolDescription(options?: {
 
   // If we have a current channel, show its actions and list other configured channels
   if (options?.currentChannel) {
+    if (isInternalMessageChannel(options.currentChannel)) {
+      return `${baseDescription} Current session is webchat (orchestrator UI): default delivery surface is webchat—no external channel config required. For files or archives, use action send with target (or to) webchat and set media, path, or filePath. For plain text to the operator, reply in the normal assistant message; this tool rejects text-only sends to webchat.`;
+    }
     const channelActions = filterActionsForContext({
       actions: listChannelSupportedActions({
         cfg: options.config,

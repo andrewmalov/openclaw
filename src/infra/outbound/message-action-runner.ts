@@ -749,48 +749,47 @@ export async function runMessageAction(
   });
 
   const channel = await resolveChannel(cfg, params, input.toolContext);
-  // When session is webchat/orchestrator and agent passes target=webchat, do not route to
-  // another channel (e.g. Telegram) with to="webchat" — that causes getChat("webchat") and 401.
+  // When session is webchat/orchestrator and the send targets the webchat surface (resolved
+  // channel webchat, or legacy to=webchat while another channel was wrongly selected), use
+  // inline relay for media instead of routing to an external API with target "webchat".
   const toRaw = readStringParam(params, "to", { allowEmpty: true })?.trim().toLowerCase();
   const sessionIsWebchat = input.toolContext?.currentChannelProvider === INTERNAL_MESSAGE_CHANNEL;
-  if (
-    sessionIsWebchat &&
-    channel !== INTERNAL_MESSAGE_CHANNEL &&
-    (toRaw === "webchat" || toRaw === "@webchat")
-  ) {
-    if (action === "send") {
-      const mediaUrl =
-        readStringParam(params, "media", { trim: false }) ??
-        readStringParam(params, "path", { trim: false }) ??
-        readStringParam(params, "filePath", { trim: false });
-      const mediaUrls = Array.isArray(params.mediaUrls)
-        ? params.mediaUrls.filter((v): v is string => typeof v === "string" && v.trim().length > 0)
-        : undefined;
-      const message = readStringParam(params, "message", { allowEmpty: true }) ?? "";
-      if (mediaUrl || (mediaUrls && mediaUrls.length > 0)) {
-        const payload = {
-          channel,
-          to: "webchat",
-          via: "direct" as const,
-          mediaUrl: mediaUrl ?? null,
-          ...(mediaUrls && mediaUrls.length > 0 ? { mediaUrls } : {}),
-          inlineRelay: true,
-          note: "Webchat inline relay: media returned to orchestrator via reply payload.",
-        };
-        return {
-          kind: "send",
-          channel,
-          action: "send",
-          to: "webchat",
-          handledBy: "core",
-          payload: {
-            ...payload,
-            ...(message.trim() ? { message } : {}),
-          },
-          sendResult: payload,
-          dryRun: Boolean(input.dryRun ?? readBooleanParam(params, "dryRun")),
-        };
-      }
+  const targetsWebchatSurface =
+    channel === INTERNAL_MESSAGE_CHANNEL || toRaw === "webchat" || toRaw === "@webchat";
+  if (sessionIsWebchat && targetsWebchatSurface && action === "send") {
+    const mediaUrl =
+      readStringParam(params, "media", { trim: false }) ??
+      readStringParam(params, "path", { trim: false }) ??
+      readStringParam(params, "filePath", { trim: false });
+    const mediaUrls = Array.isArray(params.mediaUrls)
+      ? params.mediaUrls.filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+      : undefined;
+    const message = readStringParam(params, "message", { allowEmpty: true }) ?? "";
+    if (mediaUrl || (mediaUrls && mediaUrls.length > 0)) {
+      const relayChannel =
+        channel === INTERNAL_MESSAGE_CHANNEL ? INTERNAL_MESSAGE_CHANNEL : channel;
+      const payload = {
+        channel: relayChannel,
+        to: "webchat",
+        via: "direct" as const,
+        mediaUrl: mediaUrl ?? null,
+        ...(mediaUrls && mediaUrls.length > 0 ? { mediaUrls } : {}),
+        inlineRelay: true,
+        note: "Webchat inline relay: media returned to orchestrator via reply payload.",
+      };
+      return {
+        kind: "send",
+        channel: relayChannel,
+        action: "send",
+        to: "webchat",
+        handledBy: "core",
+        payload: {
+          ...payload,
+          ...(message.trim() ? { message } : {}),
+        },
+        sendResult: payload,
+        dryRun: Boolean(input.dryRun ?? readBooleanParam(params, "dryRun")),
+      };
     }
     throw new Error(
       "Sending to webchat via the message tool is not supported for text-only sends. In webchat/orchestrator sessions, send text as a normal assistant reply; media/file sends may use message tool target=webchat for inline relay.",

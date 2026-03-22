@@ -128,6 +128,10 @@ describe("resolveMessageChannelSelection", () => {
   beforeEach(() => {
     mocks.listChannelPlugins.mockReset();
     mocks.listChannelPlugins.mockReturnValue([]);
+    mocks.resolveOutboundChannelPlugin.mockReset();
+    mocks.resolveOutboundChannelPlugin.mockImplementation(({ channel }: { channel: string }) => ({
+      id: channel,
+    }));
   });
 
   it("keeps explicit known channels and marks source explicit", async () => {
@@ -246,5 +250,67 @@ describe("resolveMessageChannelSelection", () => {
     ).rejects.toThrow(
       "Channel is required when multiple channels are configured: discord, telegram",
     );
+  });
+
+  it("resolves webchat from fallback when no external channels are configured", async () => {
+    const selection = await resolveMessageChannelSelection({
+      cfg: {} as never,
+      fallbackChannel: "webchat",
+    });
+
+    expect(selection).toEqual({
+      channel: "webchat",
+      configured: [],
+      source: "tool-context-fallback",
+    });
+  });
+
+  it("resolves explicit webchat without plugin registry", async () => {
+    const selection = await resolveMessageChannelSelection({
+      cfg: {} as never,
+      channel: "webchat",
+    });
+
+    expect(selection).toEqual({
+      channel: "webchat",
+      configured: [],
+      source: "explicit",
+    });
+  });
+
+  it("defaults to webchat when multiple externals are configured and fallback is webchat", async () => {
+    mocks.listChannelPlugins.mockReturnValue([
+      makePlugin({ id: "discord", isConfigured: async () => true }),
+      makePlugin({ id: "telegram", isConfigured: async () => true }),
+    ]);
+
+    const selection = await resolveMessageChannelSelection({
+      cfg: {} as never,
+      fallbackChannel: "webchat",
+    });
+
+    expect(selection).toEqual({
+      channel: "webchat",
+      configured: ["discord", "telegram"],
+      source: "tool-context-fallback",
+    });
+  });
+
+  it("falls back to webchat when explicit channel is unavailable and tool context is webchat", async () => {
+    mocks.resolveOutboundChannelPlugin.mockImplementation(({ channel }: { channel: string }) =>
+      channel === "discord" ? undefined : { id: channel },
+    );
+
+    const selection = await resolveMessageChannelSelection({
+      cfg: {} as never,
+      channel: "discord",
+      fallbackChannel: "webchat",
+    });
+
+    expect(selection).toEqual({
+      channel: "webchat",
+      configured: [],
+      source: "tool-context-fallback",
+    });
   });
 });

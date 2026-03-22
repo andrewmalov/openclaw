@@ -3,14 +3,17 @@ import type { ChannelPlugin } from "../../channels/plugins/types.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { defaultRuntime } from "../../runtime.js";
 import {
+  INTERNAL_MESSAGE_CHANNEL,
   listDeliverableMessageChannels,
-  type DeliverableMessageChannel,
+  type GatewayMessageChannel,
   isDeliverableMessageChannel,
+  isInternalMessageChannel,
   normalizeMessageChannel,
 } from "../../utils/message-channel.js";
 import { resolveOutboundChannelPlugin } from "./channel-resolution.js";
 
-export type MessageChannelId = DeliverableMessageChannel;
+/** Includes internal orchestrator/webchat surface for tool channel resolution. */
+export type MessageChannelId = GatewayMessageChannel;
 export type MessageChannelSelectionSource =
   | "explicit"
   | "tool-context-fallback"
@@ -50,6 +53,12 @@ function resolveAvailableKnownChannel(params: {
   })
     ? normalized
     : undefined;
+}
+
+function resolveInternalWebchatFromContext(
+  value?: string | null,
+): typeof INTERNAL_MESSAGE_CHANNEL | undefined {
+  return isInternalMessageChannel(value) ? INTERNAL_MESSAGE_CHANNEL : undefined;
 }
 
 function isAccountEnabled(account: unknown): boolean {
@@ -153,6 +162,14 @@ export async function resolveMessageChannelSelection(params: {
 }> {
   const normalized = normalizeMessageChannel(params.channel);
   if (normalized) {
+    if (isInternalMessageChannel(normalized)) {
+      return {
+        channel: INTERNAL_MESSAGE_CHANNEL,
+        configured: await listConfiguredMessageChannels(params.cfg),
+        source: "explicit",
+      };
+    }
+
     const availableExplicit = resolveAvailableKnownChannel({
       cfg: params.cfg,
       value: normalized,
@@ -165,6 +182,14 @@ export async function resolveMessageChannelSelection(params: {
       if (fallback) {
         return {
           channel: fallback,
+          configured: await listConfiguredMessageChannels(params.cfg),
+          source: "tool-context-fallback",
+        };
+      }
+      const webchatFallback = resolveInternalWebchatFromContext(params.fallbackChannel);
+      if (webchatFallback) {
+        return {
+          channel: webchatFallback,
           configured: await listConfiguredMessageChannels(params.cfg),
           source: "tool-context-fallback",
         };
@@ -188,6 +213,15 @@ export async function resolveMessageChannelSelection(params: {
   if (fallback) {
     return {
       channel: fallback,
+      configured: await listConfiguredMessageChannels(params.cfg),
+      source: "tool-context-fallback",
+    };
+  }
+
+  const webchatFromContext = resolveInternalWebchatFromContext(params.fallbackChannel);
+  if (webchatFromContext) {
+    return {
+      channel: webchatFromContext,
       configured: await listConfiguredMessageChannels(params.cfg),
       source: "tool-context-fallback",
     };

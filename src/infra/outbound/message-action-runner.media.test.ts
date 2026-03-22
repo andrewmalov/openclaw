@@ -432,4 +432,32 @@ describe("runMessageAction media behavior", () => {
       }
     });
   });
+
+  describe("webchat inline relay (orchestrator)", () => {
+    it("resolves webchat channel and returns inline relay when session is webchat with media", async () => {
+      const result = await runMessageAction({
+        cfg: {} as OpenClawConfig,
+        action: "send",
+        params: {
+          target: "webchat",
+          media: "/tmp/demo.log",
+          message: "logs attached",
+        },
+        toolContext: { currentChannelProvider: "webchat" },
+        dryRun: true,
+      });
+
+      expect(result.kind).toBe("send");
+      if (result.kind !== "send") {
+        throw new Error("expected send");
+      }
+      expect(result.channel).toBe("webchat");
+      expect(result.to).toBe("webchat");
+      expect(result.payload).toMatchObject({
+        inlineRelay: true,
+        mediaUrl: "/tmp/demo.log",
+      });
+      expect(result.sendResult?.mediaUrl).toBe("/tmp/demo.log");
+    });
+  });
 });
