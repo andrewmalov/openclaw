@@ -777,7 +777,10 @@ function sanitizeChatHistoryMessages(messages: unknown[]): unknown[] {
   return changed ? next : messages;
 }
 
-function buildOversizedHistoryPlaceholder(message?: unknown): Record<string, unknown> {
+function buildOversizedHistoryPlaceholder(
+  message: unknown,
+  outgoingMaxBytes: number,
+): Record<string, unknown> {
   const role =
     message &&
     typeof message === "object" &&
@@ -790,19 +793,60 @@ function buildOversizedHistoryPlaceholder(message?: unknown): Record<string, unk
     typeof (message as { timestamp?: unknown }).timestamp === "number"
       ? (message as { timestamp: number }).timestamp
       : Date.now();
-  return {
+
+  const placeholder: Record<string, unknown> = {
     role,
     timestamp,
     content: [{ type: "text", text: CHAT_HISTORY_OVERSIZED_PLACEHOLDER }],
     __openclaw: { truncated: true, reason: "oversized" },
   };
+
+  // Carry forward media[] from the original message so orchestrator can still deliver files.
+  // content (base64) is dropped if it exceeds the per-attachment size limit, but
+  // mimeType, fileName, and type are always preserved.
+  if (message && typeof message === "object") {
+    const entry = message as Record<string, unknown>;
+    if (Array.isArray(entry.media)) {
+      const media: ChatHistoryMediaItem[] = [];
+      for (const item of entry.media) {
+        if (!item || typeof item !== "object") {
+          continue;
+        }
+        const m = item as Record<string, unknown>;
+        const type = typeof m.type === "string" ? m.type : undefined;
+        const mimeType = typeof m.mimeType === "string" ? m.mimeType : undefined;
+        const fileName = typeof m.fileName === "string" ? m.fileName : undefined;
+        const content = typeof m.content === "string" ? m.content : undefined;
+        if (!type) {
+          continue;
+        }
+        const outItem: ChatHistoryMediaItem = { type: type as "image" | "file" };
+        if (mimeType) {
+          outItem.mimeType = mimeType;
+        }
+        if (fileName) {
+          outItem.fileName = fileName;
+        }
+        if (content && estimateBase64DecodedBytes(content) <= outgoingMaxBytes) {
+          outItem.content = content;
+        }
+        media.push(outItem);
+      }
+      if (media.length > 0) {
+        placeholder.media = media;
+      }
+    }
+  }
+
+  return placeholder;
 }
 
 function replaceOversizedChatHistoryMessages(params: {
   messages: unknown[];
   maxSingleMessageBytes: number;
+  outgoingMaxBytes: number;
 }): { messages: unknown[]; replacedCount: number } {
-  const { messages, maxSingleMessageBytes } = params;
+  const { messages, maxSingleMessageBytes, outgoingMaxBytes } = params;
   if (messages.length === 0) {
     return { messages, replacedCount: 0 };
   }
@@ -812,16 +856,20 @@ function replaceOversizedChatHistoryMessages(params: {
       return message;
     }
     replacedCount += 1;
-    return buildOversizedHistoryPlaceholder(message);
+    return buildOversizedHistoryPlaceholder(message, outgoingMaxBytes);
   });
   return { messages: replacedCount > 0 ? next : messages, replacedCount };
 }
 
-function enforceChatHistoryFinalBudget(params: { messages: unknown[]; maxBytes: number }): {
+function enforceChatHistoryFinalBudget(params: {
+  messages: unknown[];
+  maxBytes: number;
+  outgoingMaxBytes: number;
+}): {
   messages: unknown[];
   placeholderCount: number;
 } {
-  const { messages, maxBytes } = params;
+  const { messages, maxBytes, outgoingMaxBytes } = params;
   if (messages.length === 0) {
     return { messages, placeholderCount: 0 };
   }
@@ -832,7 +880,7 @@ function enforceChatHistoryFinalBudget(params: { messages: unknown[]; maxBytes: 
   if (last && jsonUtf8Bytes([last]) <= maxBytes) {
     return { messages: [last], placeholderCount: 0 };
   }
-  const placeholder = buildOversizedHistoryPlaceholder(last);
+  const placeholder = buildOversizedHistoryPlaceholder(last, outgoingMaxBytes);
   if (jsonUtf8Bytes([placeholder]) <= maxBytes) {
     return { messages: [placeholder], placeholderCount: 1 };
   }
@@ -1245,12 +1293,20 @@ export const chatHandlers: GatewayRequestHandlers = {
     const normalized = sanitizeChatHistoryMessages(enriched);
     const maxHistoryBytes = getMaxChatHistoryMessagesBytes();
     const perMessageHardCap = Math.min(CHAT_HISTORY_MAX_SINGLE_MESSAGE_BYTES, maxHistoryBytes);
+    const outgoingMaxBytes =
+      cfg.gateway?.rpcAttachments?.outgoingPerAttachmentMaxBytes ??
+      GATEWAY_RPC_ATTACHMENT_DEFAULT_MAX_BYTES;
     const replaced = replaceOversizedChatHistoryMessages({
       messages: normalized,
       maxSingleMessageBytes: perMessageHardCap,
+      outgoingMaxBytes,
     });
     const capped = capArrayByJsonBytes(replaced.messages, maxHistoryBytes).items;
-    const bounded = enforceChatHistoryFinalBudget({ messages: capped, maxBytes: maxHistoryBytes });
+    const bounded = enforceChatHistoryFinalBudget({
+      messages: capped,
+      maxBytes: maxHistoryBytes,
+      outgoingMaxBytes,
+    });
     const placeholderCount = replaced.replacedCount + bounded.placeholderCount;
     if (placeholderCount > 0) {
       chatHistoryPlaceholderEmitCount += placeholderCount;
