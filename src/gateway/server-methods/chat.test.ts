@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { jsonUtf8Bytes } from "../../infra/json-utf8-bytes.js";
 import { estimateBase64DecodedBytes } from "../../media/base64.js";
+import { sanitizeChatHistoryMessages } from "./chat.js";
+import { extractAssistantTextForSilentCheck } from "./chat.js";
 
 const CHAT_HISTORY_OVERSIZED_PLACEHOLDER = "[chat.history omitted: message too large]";
 
@@ -314,5 +316,140 @@ describe("enforceChatHistoryFinalBudget", () => {
     const result = buildOversizedHistoryPlaceholder(msg, 100_000_000);
     const media = result.media as ChatHistoryMediaItem[];
     expect(media[0]).toHaveProperty("content", "JVBERi");
+  });
+});
+
+describe("extractAssistantTextForSilentCheck", () => {
+  it("returns undefined for non-assistant messages", () => {
+    const msg = {
+      role: "tool",
+      content: [{ type: "toolCall", id: "1", name: "foo", arguments: {} }],
+    };
+    expect(extractAssistantTextForSilentCheck(msg)).toBeUndefined();
+  });
+
+  it("returns text for assistant message with mixed text and toolCall content (message is kept)", () => {
+    const msg = {
+      role: "assistant",
+      content: [
+        { type: "text", text: "hello" },
+        { type: "toolCall", id: "1", name: "foo", arguments: {} },
+      ],
+    };
+    // Returns the text, which means isSilentReplyText returns false → message is kept
+    expect(extractAssistantTextForSilentCheck(msg)).toBe("hello");
+  });
+
+  it("returns SILENT_REPLY_TOKEN for toolCall-only assistant message (no text, no media)", () => {
+    const msg = {
+      role: "assistant",
+      content: [{ type: "toolCall", id: "1", name: "foo", arguments: {} }],
+    };
+    expect(extractAssistantTextForSilentCheck(msg)).toBe("NO_REPLY");
+  });
+
+  it("returns SILENT_REPLY_TOKEN for assistant message with only reasoning block", () => {
+    // reasoning blocks are not text and not toolCall, so this returns undefined (kept)
+    const msg = { role: "assistant", content: [{ type: "reasoning", text: "thinking..." }] };
+    expect(extractAssistantTextForSilentCheck(msg)).toBeUndefined();
+  });
+});
+
+describe("sanitizeChatHistoryMessages — toolCall-only NO_REPLY (Bug 2)", () => {
+  it("drops assistant message with toolCall-only content and no media", () => {
+    const messages = [
+      { role: "user", content: "send the file" },
+      {
+        role: "assistant",
+        content: [{ type: "toolCall", id: "1", name: "message", arguments: { target: "webchat" } }],
+      },
+    ];
+    const result = sanitizeChatHistoryMessages(messages);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toHaveProperty("role", "user");
+  });
+
+  it("keeps assistant message with toolCall-only content when media is present", () => {
+    const messages = [
+      { role: "user", content: "send the file" },
+      {
+        role: "assistant",
+        content: [{ type: "toolCall", id: "1", name: "message", arguments: { target: "webchat" } }],
+        media: [
+          { type: "file", mimeType: "application/pdf", fileName: "report.pdf", content: "JVBERi" },
+        ],
+      },
+    ];
+    const result = sanitizeChatHistoryMessages(messages);
+    expect(result).toHaveLength(2);
+  });
+
+  it("keeps assistant message with mixed toolCall and text content", () => {
+    const messages = [
+      { role: "user", content: "send the file" },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "Sending your file..." },
+          { type: "toolCall", id: "1", name: "message", arguments: { target: "webchat" } },
+        ],
+      },
+    ];
+    const result = sanitizeChatHistoryMessages(messages);
+    expect(result).toHaveLength(2);
+  });
+
+  it("keeps non-assistant messages with toolCall content (e.g., tool role)", () => {
+    const messages = [
+      { role: "user", content: "send the file" },
+      {
+        role: "tool",
+        content: [{ type: "toolCall", id: "1", name: "message", arguments: { target: "webchat" } }],
+      },
+    ];
+    const result = sanitizeChatHistoryMessages(messages);
+    expect(result).toHaveLength(2);
+  });
+
+  it("drops assistant message with toolCall-only content and text field that is exactly NO_REPLY token", () => {
+    const messages = [
+      { role: "user", content: "send the file" },
+      {
+        role: "assistant",
+        content: [{ type: "toolCall", id: "1", name: "message", arguments: { target: "webchat" } }],
+        text: "NO_REPLY",
+      },
+    ];
+    const result = sanitizeChatHistoryMessages(messages);
+    expect(result).toHaveLength(1);
+  });
+
+  it("keeps assistant message with toolCall-only content and non-empty text field", () => {
+    const messages = [
+      { role: "user", content: "send the file" },
+      {
+        role: "assistant",
+        content: [{ type: "toolCall", id: "1", name: "message", arguments: { target: "webchat" } }],
+        text: "Please wait",
+      },
+    ];
+    const result = sanitizeChatHistoryMessages(messages);
+    expect(result).toHaveLength(2);
+  });
+
+  it("drops multiple consecutive toolCall-only assistant messages", () => {
+    const messages = [
+      { role: "user", content: "send the file" },
+      {
+        role: "assistant",
+        content: [{ type: "toolCall", id: "1", name: "message", arguments: { target: "webchat" } }],
+      },
+      {
+        role: "assistant",
+        content: [{ type: "toolCall", id: "2", name: "other", arguments: {} }],
+      },
+    ];
+    const result = sanitizeChatHistoryMessages(messages);
+    expect(result).toHaveLength(1);
   });
 });

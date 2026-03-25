@@ -484,9 +484,15 @@ function sanitizeChatHistoryMessage(message: unknown): { message: unknown; chang
  * Returns `undefined` for non-assistant messages or messages with no extractable text.
  * When `entry.text` is present it takes precedence over `entry.content` to avoid
  * dropping messages that carry real text alongside a stale `content: "NO_REPLY"`.
- * Bails on first non-text block (used to detect "all text" vs mixed content).
+ *
+ * For array content blocks:
+ * - If all blocks are `text` type: joins and returns the combined text.
+ * - If the message is toolCall-only (content has only `toolCall` blocks, no text blocks):
+ *   returns `SILENT_REPLY_TOKEN` so the message is dropped as a silent NO_REPLY.
+ * - Mixed content (both text and toolCall blocks) or any other non-text block type:
+ *   returns `undefined` (message is kept).
  */
-function extractAssistantTextForSilentCheck(message: unknown): string | undefined {
+export function extractAssistantTextForSilentCheck(message: unknown): string | undefined {
   if (!message || typeof message !== "object") {
     return undefined;
   }
@@ -504,18 +510,32 @@ function extractAssistantTextForSilentCheck(message: unknown): string | undefine
     return undefined;
   }
 
+  let textBlockCount = 0;
+  let toolCallBlockCount = 0;
   const texts: string[] = [];
+
   for (const block of entry.content) {
     if (!block || typeof block !== "object") {
       return undefined;
     }
     const typed = block as { type?: unknown; text?: unknown };
-    if (typed.type !== "text" || typeof typed.text !== "string") {
+    if (typed.type === "text" && typeof typed.text === "string") {
+      textBlockCount++;
+      texts.push(typed.text);
+    } else if (typed.type === "toolCall") {
+      toolCallBlockCount++;
+    } else {
       return undefined;
     }
-    texts.push(typed.text);
   }
-  return texts.length > 0 ? texts.join("\n") : undefined;
+
+  if (textBlockCount > 0) {
+    return texts.join("\n");
+  }
+  if (toolCallBlockCount > 0 && textBlockCount === 0) {
+    return SILENT_REPLY_TOKEN;
+  }
+  return undefined;
 }
 
 /**
@@ -753,7 +773,7 @@ async function injectMessageToolMediaIntoLastAssistantMessage(
   return copy;
 }
 
-function sanitizeChatHistoryMessages(messages: unknown[]): unknown[] {
+export function sanitizeChatHistoryMessages(messages: unknown[]): unknown[] {
   if (messages.length === 0) {
     return messages;
   }
