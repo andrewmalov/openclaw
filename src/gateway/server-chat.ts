@@ -5,6 +5,7 @@ import { loadConfig } from "../config/config.js";
 import { type AgentEventPayload, getAgentRunContext } from "../infra/agent-events.js";
 import { resolveHeartbeatVisibility } from "../infra/heartbeat-visibility.js";
 import { stripInlineDirectiveTagsForDisplay } from "../utils/directive-tags.js";
+import { createBlockEventEmitter } from "./server/session-chat.js";
 import { loadSessionEntry } from "./session-utils.js";
 import { formatForLog } from "./ws-log.js";
 
@@ -338,6 +339,8 @@ export function createAgentEventHandler({
   clearAgentRunContext,
   toolEventRecipients,
 }: AgentEventHandlerOptions) {
+  const { emitBlockEvent } = createBlockEventEmitter({ broadcast });
+
   const emitChatDelta = (
     sessionKey: string,
     clientRunId: string,
@@ -388,6 +391,9 @@ export function createAgentEventHandler({
     };
     broadcast("chat", payload, { dropIfSlow: true });
     nodeSendToSession(sessionKey, "chat", payload);
+
+    // Emit block event for RPC clients (real-time streaming)
+    emitBlockEvent(sessionKey, clientRunId, { type: "text", text: mergedText }, false);
   };
 
   const resolveBufferedChatTextState = (clientRunId: string, sourceRunId: string) => {
@@ -485,6 +491,11 @@ export function createAgentEventHandler({
       };
       broadcast("chat", payload);
       nodeSendToSession(sessionKey, "chat", payload);
+
+      // Emit final block event for RPC clients
+      if (text && !shouldSuppressSilent) {
+        emitBlockEvent(sessionKey, clientRunId, { type: "text", text }, true);
+      }
       return;
     }
     const payload = {

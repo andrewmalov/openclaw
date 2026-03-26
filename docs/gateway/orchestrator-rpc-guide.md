@@ -261,7 +261,99 @@ If the Gateway omits **`content`** for an item (e.g. file over the outgoing limi
 1. Iterate `message.media` (if present).
 2. For each item with **`content`**: decode base64 and send as photo/document/audio etc. to your channel (e.g. Telegram `sendPhoto` / `sendDocument`).
 3. Use **`mimeType`** and **`fileName`** for type and filename when uploading or saving.
-4. If **`content`** is missing, the file was over the Gateway’s outgoing limit; you can show a placeholder or wait for a future `mediaUrl` if the Gateway adds it.
+4. If **`content`** is missing, the file was over the Gateway's outgoing limit; you can show a placeholder or wait for a future `mediaUrl` if the Gateway adds it.
+
+---
+
+## Receiving real-time block events
+
+When `blockStreamingDefault: "on"` is configured, the Gateway sends `chat.block` events to WebSocket clients in real-time, enabling progressive text streaming to end users.
+
+### Enabling block streaming
+
+Ensure the agent config has block streaming enabled:
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "blockStreamingDefault": "on"
+    }
+  }
+}
+```
+
+### Handling `chat.block` events
+
+Listen for `event: "chat.block"` frames:
+
+```python
+# Python example using websockets
+async def on_message(ws, message):
+    data = json.loads(message)
+    if data.get("type") == "event" and data.get("event") == "chat.block":
+        payload = data.get("payload", {})
+        block = payload.get("block", {})
+        is_final = payload.get("isFinal", False)
+
+        if block.get("type") == "text":
+            text = block.get("text", "")
+            # Stream to user (e.g., Telegram editMessageText)
+            await telegram.edit_message_text(chat_id, message_id, text)
+
+            if is_final:
+                # Final block received, message is complete
+                pass
+```
+
+### JavaScript/TypeScript example
+
+```typescript
+ws.on("message", (data: string) => {
+  const frame = JSON.parse(data);
+
+  if (frame.type === "event" && frame.event === "chat.block") {
+    const { block, isFinal } = frame.payload;
+
+    if (block.type === "text") {
+      // Stream to user (e.g., edit Telegram message)
+      bot.telegram.editMessageText(chatId, messageId, null, block.text, { parse_mode: "HTML" });
+    }
+
+    if (isFinal) {
+      // Message complete - stop editing
+    }
+  }
+});
+```
+
+### Event payload
+
+| Field        | Type    | Description                           |
+| ------------ | ------- | ------------------------------------- |
+| `sessionKey` | string  | Session identifier                    |
+| `runId`      | string  | Run ID for this execution             |
+| `block.type` | string  | `"text"`, `"image"`, or `"tool_call"` |
+| `block.text` | string  | Text content (for `type: "text"`)     |
+| `isFinal`    | boolean | `true` for final block                |
+
+### Backward compatibility
+
+Clients that do not handle `chat.block` events continue to work normally. The Gateway also sends the complete message via `chat.history` after `agent.wait` completes. Orchestrators can:
+
+1. **Ignore events**: Use only `agent.wait` + `chat.history` (existing behavior)
+2. **Handle events**: Listen for `chat.block`, stream to users, then call `chat.history` to get final state
+3. **Hybrid**: Handle events for real-time feedback, but use `chat.history` for the authoritative final message
+
+### Block streaming behavior
+
+| Config                               | Behavior                           |
+| ------------------------------------ | ---------------------------------- |
+| `blockStreamingDefault: "on"`        | Block events enabled               |
+| `blockStreamingBreak: "text_end"`    | Event on each text block (default) |
+| `blockStreamingBreak: "message_end"` | Only final block sent              |
+
+---
 
 ---
 

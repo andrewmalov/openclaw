@@ -155,6 +155,30 @@ export const EventFrameSchema = Type.Object(
   { additionalProperties: false },
 );
 
+// Block content types for chat.block events
+export const ChatBlockContentTextSchema = Type.Object(
+  {
+    type: Type.Literal("text"),
+    text: Type.String(),
+  },
+  { additionalProperties: false },
+);
+
+export const ChatBlockContentSchema = Type.Union([ChatBlockContentTextSchema], {
+  discriminator: "type",
+});
+
+// Payload for chat.block events - forwarded to RPC clients for real-time streaming
+export const ChatBlockEventPayloadSchema = Type.Object(
+  {
+    sessionKey: NonEmptyString,
+    runId: NonEmptyString,
+    block: ChatBlockContentSchema,
+    isFinal: Type.Boolean(),
+  },
+  { additionalProperties: false },
+);
+
 // Discriminated union of all top-level frames. Using a discriminator makes
 // downstream codegen (quicktype) produce tighter types instead of all-optional
 // blobs.

@@ -269,6 +269,49 @@ For a developer-oriented guide (request/response examples, validation errors, us
 
 Full contract (limits, MIME policy, config keys, deployment note for proxy/WebSocket message size): [Gateway RPC attachments contract](https://github.com/openclaw/openclaw/blob/main/specs/001-gateway-rpc-file-transfer/contracts/gateway-rpc-attachments.md).
 
+## Block streaming events (RPC)
+
+When `blockStreamingDefault: "on"` is configured in `agents.defaults`, the Gateway forwards block events to RPC clients in real-time, enabling orchestrators to stream intermediate text to end users (e.g., Telegram).
+
+**Event**: `chat.block`
+
+```json
+{
+  "type": "event",
+  "event": "chat.block",
+  "payload": {
+    "sessionKey": "agent:main:main",
+    "runId": "run-123",
+    "block": {
+      "type": "text",
+      "text": "intermediate text here..."
+    },
+    "isFinal": false
+  }
+}
+```
+
+**Payload fields**:
+
+| Field        | Type    | Description                                        |
+| ------------ | ------- | -------------------------------------------------- |
+| `sessionKey` | string  | Session identifier (e.g., `agent:main:main`)       |
+| `runId`      | string  | Run identifier for this agent execution            |
+| `block`      | object  | Block content (see below)                          |
+| `isFinal`    | boolean | `true` if this is the final block for this message |
+
+**Block types**:
+
+- `{type: "text", text: string}` - Text content
+- `{type: "image", url: string}` - Image URL
+- `{type: "tool_call", name: string, input: object}` - Tool call
+
+**Behavior**:
+
+- When `blockStreamingBreak: "text_end"` (default): `chat.block` events are sent as each text block completes
+- When `blockStreamingBreak: "message_end"`: Only the final block (`isFinal: true`) is sent
+- Clients should ignore events with unknown block types for forward compatibility
+
 ## Scope
 
 This protocol exposes the **full gateway API** (status, channels, models, chat,
