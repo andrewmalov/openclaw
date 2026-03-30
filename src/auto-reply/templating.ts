@@ -93,6 +93,17 @@ export type MsgContext = {
   MediaPaths?: string[];
   MediaUrls?: string[];
   MediaTypes?: string[];
+  /**
+   * Inbound attachments passed via RPC/gateway opts (e.g. webchat chat.send attachments).
+   * Used as fallback when MediaPaths/MediaUrls are not set.
+   * Shape: Array<{ type: string; mimeType?: string; fileName?: string; content: string }>
+   */
+  InboundAttachments?: Array<{
+    type: string;
+    mimeType?: string;
+    fileName?: string;
+    content: string;
+  }>;
   /** Telegram sticker metadata (emoji, set name, file IDs, cached description). */
   Sticker?: StickerMetadata;
   /** True when current-turn sticker media is present in MediaPaths (false for cached-description path). */

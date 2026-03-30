@@ -125,6 +125,11 @@ export async function getReplyFromConfig(
 
   const finalized = finalizeInboundContext(ctx);
 
+  // Bridge RPC/gateway inbound attachments so applyMediaUnderstanding can see them.
+  if (opts?.attachments?.length) {
+    finalized.InboundAttachments = opts.attachments;
+  }
+
   if (!isFastTestEnv) {
     await applyMediaUnderstanding({
       ctx: finalized,

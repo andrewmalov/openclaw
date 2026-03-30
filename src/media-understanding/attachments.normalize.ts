@@ -59,6 +59,19 @@ export function normalizeAttachments(ctx: MsgContext): MediaAttachment[] {
   const pathValue = ctx.MediaPath?.trim();
   const url = ctx.MediaUrl?.trim();
   if (!pathValue && !url) {
+    // Fall back to gateway/RPC inbound attachments (e.g. webchat chat.send with base64 content).
+    const inbound = ctx.InboundAttachments;
+    if (Array.isArray(inbound) && inbound.length > 0) {
+      return inbound.map((att, idx) => ({
+        path: undefined,
+        url: undefined,
+        mime: att.mimeType,
+        index: idx,
+        contentBase64: att.content,
+        fileName: att.fileName,
+        originalType: att.type,
+      }));
+    }
     return [];
   }
   return [

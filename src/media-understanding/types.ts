@@ -11,6 +11,12 @@ export type MediaAttachment = {
   mime?: string;
   index: number;
   alreadyTranscribed?: boolean;
+  /** Base64-encoded content from RPC/gateway inbound attachments (e.g. webchat chat.send). */
+  contentBase64?: string;
+  /** Original file name from the attachment. */
+  fileName?: string;
+  /** Original `type` string from the RPC attachment. */
+  originalType?: string;
 };
 
 export type MediaUnderstandingOutput = {

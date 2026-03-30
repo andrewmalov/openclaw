@@ -122,11 +122,32 @@ export class MediaAttachmentCache {
       }
     }
 
+    // Handle base64-encoded content from RPC/gateway inbound attachments (e.g. webchat chat.send).
+    const contentBase64 = entry.attachment.contentBase64?.trim();
+    if (contentBase64) {
+      const buffer = Buffer.from(contentBase64, "base64");
+      if (buffer.length > params.maxBytes) {
+        throw new MediaUnderstandingSkipError(
+          "maxBytes",
+          `Attachment ${params.attachmentIndex + 1} exceeds maxBytes ${params.maxBytes}`,
+        );
+      }
+      entry.buffer = buffer;
+      entry.bufferMime = entry.attachment.mime;
+      entry.bufferFileName = entry.attachment.fileName ?? `media-${params.attachmentIndex + 1}`;
+      return {
+        buffer,
+        mime: entry.bufferMime,
+        fileName: entry.bufferFileName,
+        size: buffer.length,
+      };
+    }
+
     const url = entry.attachment.url?.trim();
     if (!url) {
       throw new MediaUnderstandingSkipError(
         "empty",
-        `Attachment ${params.attachmentIndex + 1} has no path or URL.`,
+        `Attachment ${params.attachmentIndex + 1} has no path, URL, or content.`,
       );
     }
 
