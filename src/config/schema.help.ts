@@ -667,7 +667,7 @@ export const FIELD_HELP: Record<string, string> = {
   "tools.message.broadcast.enabled": "Enable broadcast action (default: true).",
   "tools.web.search.enabled": "Enable the web_search tool (requires a provider API key).",
   "tools.web.search.provider":
-    'Search provider ("brave", "firecrawl", "gemini", "grok", "kimi", or "perplexity"). Auto-detected from available API keys if omitted.',
+    'Search provider ("brave", "firecrawl", "gemini", "grok", "kimi", "litellm", or "perplexity"). Auto-detected from available API keys if omitted; when LITELLM_API_KEY and LITELLM_API_BASE are set, litellm is preferred.',
   "tools.web.search.apiKey": "Brave Search API key (fallback: BRAVE_API_KEY env var).",
   "tools.web.search.maxResults": "Number of results to return (1-10).",
   "tools.web.search.timeoutSeconds": "Timeout in seconds for web_search requests.",
@@ -694,6 +694,12 @@ export const FIELD_HELP: Record<string, string> = {
     "Optional Perplexity/OpenRouter chat-completions base URL override. Setting this opts Perplexity into the legacy Sonar/OpenRouter compatibility path.",
   "tools.web.search.perplexity.model":
     'Optional Sonar/OpenRouter model override (default: "perplexity/sonar-pro"). Setting this opts Perplexity into the legacy chat-completions compatibility path.',
+  "tools.web.search.litellm.apiKey":
+    "LiteLLM Proxy API key for web_search (fallback: LITELLM_API_KEY env var).",
+  "tools.web.search.litellm.baseUrl":
+    "Optional LiteLLM base URL override for web_search. Env LITELLM_API_BASE wins; otherwise falls back to models.providers.litellm.baseUrl.",
+  "tools.web.search.litellm.model":
+    "LiteLLM model or route name for web_search (required unless LITELLM_WEB_SEARCH_MODEL is set). Must match a search-capable route in your LiteLLM config.",
   "tools.web.fetch.enabled": "Enable the web_fetch tool (lightweight HTTP fetch).",
   "tools.web.fetch.maxChars": "Max characters returned by web_fetch (truncated).",
   "tools.web.fetch.maxCharsCap":

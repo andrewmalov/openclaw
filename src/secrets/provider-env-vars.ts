@@ -41,7 +41,11 @@ export const PROVIDER_ENV_VARS: Record<string, readonly string[]> = {
   ...CORE_PROVIDER_SETUP_ENV_VAR_OVERRIDES,
 };
 
-const EXTRA_PROVIDER_AUTH_ENV_VARS = ["MINIMAX_CODE_PLAN_KEY"] as const;
+const EXTRA_PROVIDER_AUTH_ENV_VARS = [
+  "MINIMAX_CODE_PLAN_KEY",
+  "LITELLM_API_BASE",
+  "LITELLM_WEB_SEARCH_MODEL",
+] as const;
 
 const KNOWN_SECRET_ENV_VARS = [
   ...new Set(Object.values(PROVIDER_ENV_VARS).flatMap((keys) => keys)),

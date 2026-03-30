@@ -124,7 +124,10 @@ export function resolveWebSearchProviderId(params: {
     }
   }
 
-  return providers[0]?.id ?? "brave";
+  // Match web-search-core: default provider id when nothing is configured and no keys match.
+  // Do not use providers[0] — sort order (autoDetectOrder) is not a default selection.
+  const brave = providers.find((p) => p.id === "brave");
+  return brave?.id ?? providers[0]?.id ?? "brave";
 }
 
 export function resolveWebSearchDefinition(

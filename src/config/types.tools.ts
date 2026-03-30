@@ -457,8 +457,8 @@ export type ToolsConfig = {
     search?: {
       /** Enable web search tool (default: true when API key is present). */
       enabled?: boolean;
-      /** Search provider ("brave", "firecrawl", "gemini", "grok", "kimi", or "perplexity"). */
-      provider?: "brave" | "firecrawl" | "gemini" | "grok" | "kimi" | "perplexity";
+      /** Search provider ("brave", "firecrawl", "gemini", "grok", "kimi", "litellm", or "perplexity"). */
+      provider?: "brave" | "firecrawl" | "gemini" | "grok" | "kimi" | "litellm" | "perplexity";
       /** Brave Search API key (optional; defaults to BRAVE_API_KEY env var). */
       apiKey?: SecretInput;
       /** Default search results count (1-10). */
@@ -511,6 +511,15 @@ export type ToolsConfig = {
         /** @deprecated Legacy Sonar/OpenRouter field. Ignored by Search API. */
         baseUrl?: string;
         /** @deprecated Legacy Sonar/OpenRouter field. Ignored by Search API. */
+        model?: string;
+      };
+      /** LiteLLM Proxy configuration (used when provider="litellm"). */
+      litellm?: {
+        /** LiteLLM API key (defaults to LITELLM_API_KEY env var). */
+        apiKey?: SecretInput;
+        /** Base URL override; LITELLM_API_BASE env wins when set. */
+        baseUrl?: string;
+        /** Model or route name in LiteLLM (fallback: LITELLM_WEB_SEARCH_MODEL env). */
         model?: string;
       };
     };

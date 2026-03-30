@@ -27,7 +27,7 @@ import {
   createChatRunState,
   createToolEventRecipientRegistry,
 } from "./server-chat.js";
-import { MAX_PREAUTH_PAYLOAD_BYTES } from "./server-constants.js";
+import { MAX_PAYLOAD_BYTES } from "./server-constants.js";
 import {
   attachGatewayUpgradeHandler,
   createGatewayHttpServer,
@@ -202,7 +202,9 @@ export async function createGatewayRuntimeState(params: {
 
     const wss = new WebSocketServer({
       noServer: true,
-      maxPayload: MAX_PREAUTH_PAYLOAD_BYTES,
+      // Use MAX_PAYLOAD_BYTES instead of MAX_PREAUTH_PAYLOAD_BYTES so outgoing frames
+      // (e.g. chat.history responses with large base64 images) don't exceed the 1MB default.
+      maxPayload: MAX_PAYLOAD_BYTES,
     });
     for (const server of httpServers) {
       attachGatewayUpgradeHandler({

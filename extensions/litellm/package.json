@@ -1,0 +1,12 @@
+{
+  "name": "@openclaw/litellm-plugin",
+  "version": "2026.3.14",
+  "private": true,
+  "description": "OpenClaw LiteLLM plugin (web search via proxy)",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

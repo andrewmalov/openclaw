@@ -1,0 +1,8 @@
+{
+  "id": "litellm",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

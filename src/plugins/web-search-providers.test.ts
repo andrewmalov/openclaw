@@ -15,6 +15,7 @@ describe("resolvePluginWebSearchProviders", () => {
     const providers = resolvePluginWebSearchProviders({});
 
     expect(providers.map((provider) => `${provider.pluginId}:${provider.id}`)).toEqual([
+      "litellm:litellm",
       "brave:brave",
       "google:gemini",
       "xai:grok",
@@ -35,6 +36,7 @@ describe("resolvePluginWebSearchProviders", () => {
     });
 
     expect(providers.map((provider) => provider.pluginId)).toEqual([
+      "litellm",
       "brave",
       "google",
       "xai",

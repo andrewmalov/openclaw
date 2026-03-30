@@ -1,6 +1,7 @@
 import bravePlugin from "../../extensions/brave/index.js";
 import firecrawlPlugin from "../../extensions/firecrawl/index.js";
 import googlePlugin from "../../extensions/google/index.js";
+import litellmPlugin from "../../extensions/litellm/index.js";
 import moonshotPlugin from "../../extensions/moonshot/index.js";
 import perplexityPlugin from "../../extensions/perplexity/index.js";
 import xaiPlugin from "../../extensions/xai/index.js";
@@ -24,6 +25,7 @@ const BUNDLED_WEB_SEARCH_PLUGINS: readonly RegistrablePlugin[] = [
   bravePlugin,
   firecrawlPlugin,
   googlePlugin,
+  litellmPlugin,
   moonshotPlugin,
   perplexityPlugin,
   xaiPlugin,

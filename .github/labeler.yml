@@ -254,6 +254,10 @@
   - changed-files:
       - any-glob-to-any-file:
           - "extensions/kilocode/**"
+"extensions: litellm":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "extensions/litellm/**"
 "extensions: openai":
   - changed-files:
       - any-glob-to-any-file:
