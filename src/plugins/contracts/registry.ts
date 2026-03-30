@@ -11,6 +11,7 @@ import googlePlugin from "../../../extensions/google/index.js";
 import huggingFacePlugin from "../../../extensions/huggingface/index.js";
 import kilocodePlugin from "../../../extensions/kilocode/index.js";
 import kimiCodingPlugin from "../../../extensions/kimi-coding/index.js";
+import litellmPlugin from "../../../extensions/litellm/index.js";
 import microsoftPlugin from "../../../extensions/microsoft/index.js";
 import minimaxPlugin from "../../../extensions/minimax/index.js";
 import mistralPlugin from "../../../extensions/mistral/index.js";
@@ -114,6 +115,7 @@ const bundledWebSearchPlugins: Array<RegistrablePlugin & { credentialValue: unkn
   { ...bravePlugin, credentialValue: "BSA-test" },
   { ...firecrawlPlugin, credentialValue: "fc-test" },
   { ...googlePlugin, credentialValue: "AIza-test" },
+  { ...litellmPlugin, credentialValue: "litellm-test" },
   { ...moonshotPlugin, credentialValue: "sk-test" },
   { ...perplexityPlugin, credentialValue: "pplx-test" },
   { ...xaiPlugin, credentialValue: "xai-test" },
@@ -124,6 +126,7 @@ const bundledSpeechPlugins: RegistrablePlugin[] = [elevenLabsPlugin, microsoftPl
 const bundledMediaUnderstandingPlugins: RegistrablePlugin[] = [
   anthropicPlugin,
   googlePlugin,
+  litellmPlugin,
   minimaxPlugin,
   mistralPlugin,
   moonshotPlugin,

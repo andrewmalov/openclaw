@@ -143,6 +143,19 @@ The **`model`** value must match a LiteLLM route or model name that performs web
 
 When both `LITELLM_API_KEY` and `LITELLM_API_BASE` are set and `tools.web.search.provider` is omitted, OpenClaw **prefers** the `litellm` search provider over other bundled providers (for example Brave).
 
+## Voice messages (inbound transcription + outbound TTS)
+
+When `LITELLM_API_KEY` is set, OpenClaw can route **inbound voice** transcription through the bundled LiteLLM media provider (OpenAI-compatible `/audio/transcriptions`). The default transcription model is **`gpt-4o-audio-preview`** unless you override it under `tools.media.audio.models` or your agent media settings.
+
+For **outbound speech**, if your OpenAI-compatible TTS `baseUrl` matches `LITELLM_API_BASE` (after trimming trailing slashes) and you do not set `messages.tts.openai.model`, synthesis defaults to **`gpt-4o-audio-preview`** for parity with the inbound path.
+
+Set the same environment variables as for web search:
+
+```bash
+export LITELLM_API_KEY="your-litellm-key"
+export LITELLM_API_BASE="http://localhost:4000/v1"
+```
+
 ## Model routing
 
 LiteLLM can route model requests to different backends. Configure in your LiteLLM `config.yaml`:

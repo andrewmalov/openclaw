@@ -28,13 +28,20 @@ export const DEFAULT_PROMPT: Record<MediaUnderstandingCapability, string> = {
 };
 export const DEFAULT_VIDEO_MAX_BASE64_BYTES = 70 * MB;
 export const DEFAULT_AUDIO_MODELS: Record<string, string> = {
+  litellm: "gpt-4o-audio-preview",
   groq: "whisper-large-v3-turbo",
   openai: "gpt-4o-mini-transcribe",
   deepgram: "nova-3",
   mistral: "voxtral-mini-latest",
 };
 
+/** Default transcription model for a provider id when no explicit model is configured. */
+export function getDefaultAudioModelForProvider(providerId: string): string | undefined {
+  return DEFAULT_AUDIO_MODELS[providerId];
+}
+
 export const AUTO_AUDIO_KEY_PROVIDERS = [
+  "litellm",
   "openai",
   "groq",
   "deepgram",

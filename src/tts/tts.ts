@@ -54,6 +54,7 @@ const DEFAULT_ELEVENLABS_BASE_URL = "https://api.elevenlabs.io";
 const DEFAULT_ELEVENLABS_VOICE_ID = "pMsXgVXv3BLzUgSXRplE";
 const DEFAULT_ELEVENLABS_MODEL_ID = "eleven_multilingual_v2";
 const DEFAULT_OPENAI_MODEL = "gpt-4o-mini-tts";
+const DEFAULT_LITELLM_OPENAI_MODEL = "gpt-4o-audio-preview";
 const DEFAULT_OPENAI_VOICE = "alloy";
 const DEFAULT_EDGE_VOICE = "en-US-MichelleNeural";
 const DEFAULT_EDGE_LANG = "en-US";
@@ -259,6 +260,17 @@ export function resolveTtsConfig(cfg: OpenClawConfig): ResolvedTtsConfig {
   const rawMicrosoft = { ...raw.edge, ...raw.microsoft };
   const edgeOutputFormat = rawMicrosoft.outputFormat?.trim();
   const auto = normalizeTtsAutoMode(raw.auto) ?? (raw.enabled ? "always" : "off");
+  const resolvedOpenAiBaseUrl = (
+    raw.openai?.baseUrl?.trim() ||
+    process.env.OPENAI_TTS_BASE_URL?.trim() ||
+    DEFAULT_OPENAI_BASE_URL
+  ).replace(/\/+$/, "");
+  const resolvedLiteLlmBaseUrl = process.env.LITELLM_API_BASE?.trim()?.replace(/\/+$/, "");
+  const defaultOpenAiModelForBase =
+    resolvedLiteLlmBaseUrl && resolvedOpenAiBaseUrl === resolvedLiteLlmBaseUrl
+      ? DEFAULT_LITELLM_OPENAI_MODEL
+      : DEFAULT_OPENAI_MODEL;
+
   return {
     auto,
     mode: raw.mode ?? "final",
@@ -296,12 +308,8 @@ export function resolveTtsConfig(cfg: OpenClawConfig): ResolvedTtsConfig {
         path: "messages.tts.openai.apiKey",
       }),
       // Config > env var > default; strip trailing slashes for consistency.
-      baseUrl: (
-        raw.openai?.baseUrl?.trim() ||
-        process.env.OPENAI_TTS_BASE_URL?.trim() ||
-        DEFAULT_OPENAI_BASE_URL
-      ).replace(/\/+$/, ""),
-      model: raw.openai?.model ?? DEFAULT_OPENAI_MODEL,
+      baseUrl: resolvedOpenAiBaseUrl,
+      model: raw.openai?.model ?? defaultOpenAiModelForBase,
       voice: raw.openai?.voice ?? DEFAULT_OPENAI_VOICE,
       speed: raw.openai?.speed,
       instructions: raw.openai?.instructions?.trim() || undefined,

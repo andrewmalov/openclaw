@@ -30,7 +30,7 @@ export const MEDIA_AUDIO_FIELD_HELP: Record<MediaAudioFieldKey, string> = {
   "tools.media.audio.attachments":
     "Attachment policy for audio inputs indicating which uploaded files are eligible for audio processing. Keep restrictive defaults in mixed-content channels to avoid unintended audio workloads.",
   "tools.media.audio.models":
-    "Ordered model preferences specifically for audio understanding, used before shared media model fallback. Choose models optimized for transcription quality in your primary language/domain.",
+    "Ordered model preferences specifically for audio understanding, used before shared media model fallback. Choose models optimized for transcription quality in your primary language/domain. When `LITELLM_API_KEY` is set, the bundled LiteLLM provider is considered first for automatic transcription and defaults to `gpt-4o-audio-preview` unless you override it here or in agent media settings.",
   "tools.media.audio.scope":
     "Scope selector for when audio understanding runs across inbound messages and attachments. Keep focused scopes in high-volume channels to reduce cost and avoid accidental transcription.",
   "tools.media.audio.echoTranscript":

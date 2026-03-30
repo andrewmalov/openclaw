@@ -230,8 +230,10 @@ export const testState = {
   gatewayBind: undefined as "auto" | "lan" | "tailnet" | "loopback" | undefined,
   gatewayAuth: undefined as Record<string, unknown> | undefined,
   gatewayControlUi: undefined as Record<string, unknown> | undefined,
-  /** Override gateway.rpcAttachments for tests (e.g. perAttachmentMaxBytes). */
-  gatewayRpcAttachments: undefined as { perAttachmentMaxBytes?: number } | undefined,
+  /** Override gateway.rpcAttachments for tests (e.g. perAttachmentMaxBytes, outgoingPerAttachmentMaxBytes). */
+  gatewayRpcAttachments: undefined as
+    | { perAttachmentMaxBytes?: number; outgoingPerAttachmentMaxBytes?: number }
+    | undefined,
   hooksConfig: undefined as HooksConfig | undefined,
   canvasHostPort: undefined as number | undefined,
   legacyIssues: [] as Array<{ path: string; message: string }>,
@@ -455,6 +457,9 @@ vi.mock("../config/config.js", async () => {
     }
     if (testState.gatewayControlUi) {
       fileGateway.controlUi = testState.gatewayControlUi;
+    }
+    if (testState.gatewayRpcAttachments) {
+      fileGateway.rpcAttachments = testState.gatewayRpcAttachments;
     }
     const gateway = Object.keys(fileGateway).length > 0 ? fileGateway : undefined;
 

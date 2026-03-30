@@ -324,6 +324,39 @@ export function resolveLitellmSearchBaseUrl(params: {
   return undefined;
 }
 
+/**
+ * Diagnostic-only: where a LiteLLM base URL would resolve for voice/TTS (same precedence as web search).
+ * Omits URLs and secrets; safe for operator-facing logs.
+ */
+export function describeLitellmVoiceRouting(params: {
+  sourceConfig: OpenClawConfig;
+  env: NodeJS.ProcessEnv;
+}): {
+  baseUrlResolved: boolean;
+  resolution: "env" | "tools.web.search.litellm" | "models.providers.litellm" | "none";
+} {
+  const envBase = normalizeSecretInput(params.env.LITELLM_API_BASE);
+  if (envBase) {
+    return { baseUrlResolved: true, resolution: "env" };
+  }
+  const search = (params.sourceConfig.tools?.web?.search ?? {}) as Record<string, unknown>;
+  const litellmSearch = search.litellm;
+  if (
+    isRecord(litellmSearch) &&
+    typeof litellmSearch.baseUrl === "string" &&
+    litellmSearch.baseUrl.trim()
+  ) {
+    return { baseUrlResolved: true, resolution: "tools.web.search.litellm" };
+  }
+  const litellmProvider = params.sourceConfig.models?.providers?.litellm as
+    | { baseUrl?: unknown }
+    | undefined;
+  if (typeof litellmProvider?.baseUrl === "string" && litellmProvider.baseUrl.trim()) {
+    return { baseUrlResolved: true, resolution: "models.providers.litellm" };
+  }
+  return { baseUrlResolved: false, resolution: "none" };
+}
+
 function hasConfiguredSecretRef(value: unknown, defaults: SecretDefaults | undefined): boolean {
   return Boolean(
     resolveSecretInputRef({

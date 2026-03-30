@@ -3,7 +3,7 @@ import type { OpenClawConfig } from "../config/config.js";
 import * as webSearchProviders from "../plugins/web-search-providers.js";
 import * as secretResolve from "./resolve.js";
 import { createResolverContext } from "./runtime-shared.js";
-import { resolveRuntimeWebTools } from "./runtime-web-tools.js";
+import { describeLitellmVoiceRouting, resolveRuntimeWebTools } from "./runtime-web-tools.js";
 
 type ProviderUnderTest = "brave" | "gemini" | "grok" | "kimi" | "perplexity";
 
@@ -472,5 +472,27 @@ describe("runtime web tools resolution", () => {
         }),
       ]),
     );
+  });
+});
+
+describe("describeLitellmVoiceRouting", () => {
+  it("prefers env LITELLM_API_BASE", () => {
+    expect(
+      describeLitellmVoiceRouting({
+        sourceConfig: asConfig({}),
+        env: { LITELLM_API_BASE: "http://localhost:4000/v1" },
+      }),
+    ).toEqual({ baseUrlResolved: true, resolution: "env" });
+  });
+
+  it("falls back to models.providers.litellm.baseUrl", () => {
+    expect(
+      describeLitellmVoiceRouting({
+        sourceConfig: asConfig({
+          models: { providers: { litellm: { baseUrl: "http://proxy/v1", models: [] } } },
+        }),
+        env: {},
+      }),
+    ).toEqual({ baseUrlResolved: true, resolution: "models.providers.litellm" });
   });
 });

@@ -187,4 +187,80 @@ describe("runCapability auto audio entries", () => {
     expect(runResult.outputs[0]?.model).toBe("voxtral-mini-latest");
     expect(runResult.outputs[0]?.text).toBe("mistral");
   });
+
+  it("prefers litellm first when litellm credentials exist", async () => {
+    const isolatedAgentDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-audio-agent-"));
+    let runResult: Awaited<ReturnType<typeof runCapability>> | undefined;
+    try {
+      await withEnvAsync(
+        {
+          OPENAI_API_KEY: "openai-key", // pragma: allowlist secret
+          LITELLM_API_KEY: "litellm-key", // pragma: allowlist secret
+          OPENCLAW_AGENT_DIR: isolatedAgentDir,
+          PI_CODING_AGENT_DIR: isolatedAgentDir,
+        },
+        async () => {
+          await withAudioFixture("openclaw-auto-audio-litellm", async ({ ctx, media, cache }) => {
+            const providerRegistry = buildProviderRegistry({
+              litellm: {
+                id: "litellm",
+                capabilities: ["audio"],
+                transcribeAudio: async (req) => ({
+                  text: "from-litellm",
+                  model: req.model ?? "unknown",
+                }),
+              },
+              openai: {
+                id: "openai",
+                capabilities: ["audio"],
+                transcribeAudio: async () => ({
+                  text: "from-openai",
+                  model: "gpt-4o-mini-transcribe",
+                }),
+              },
+            });
+            const cfg = {
+              models: {
+                providers: {
+                  litellm: {
+                    apiKey: "litellm-key", // pragma: allowlist secret
+                    models: [],
+                  },
+                  openai: {
+                    apiKey: "openai-key", // pragma: allowlist secret
+                    models: [],
+                  },
+                },
+              },
+              tools: {
+                media: {
+                  audio: {
+                    enabled: true,
+                  },
+                },
+              },
+            } as unknown as OpenClawConfig;
+
+            runResult = await runCapability({
+              capability: "audio",
+              cfg,
+              ctx,
+              attachments: cache,
+              media,
+              providerRegistry,
+            });
+          });
+        },
+      );
+    } finally {
+      await fs.rm(isolatedAgentDir, { recursive: true, force: true });
+    }
+    if (!runResult) {
+      throw new Error("Expected auto audio litellm result");
+    }
+    expect(runResult.decision.outcome).toBe("success");
+    expect(runResult.outputs[0]?.provider).toBe("litellm");
+    expect(runResult.outputs[0]?.model).toBe("gpt-4o-audio-preview");
+    expect(runResult.outputs[0]?.text).toBe("from-litellm");
+  });
 });

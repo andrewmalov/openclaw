@@ -448,7 +448,11 @@ async function resolveAllAudioKeyEntries(params: {
     if (!entry || entry.type !== "provider") {
       return;
     }
-    const providerId = normalizeMediaProviderId(entry.provider);
+    const providerRaw = entry.provider?.trim();
+    if (!providerRaw) {
+      return;
+    }
+    const providerId = normalizeMediaProviderId(providerRaw);
     if (seenProviders.has(providerId)) {
       return;
     }

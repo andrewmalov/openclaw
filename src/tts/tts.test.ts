@@ -640,6 +640,39 @@ describe("tts", () => {
         expect(config.openai.baseUrl).toBe("http://localhost:8880/v1");
       });
     });
+
+    it("defaults TTS model to gpt-4o-audio-preview when OpenAI base matches LITELLM_API_BASE", () => {
+      withEnv(
+        {
+          OPENAI_TTS_BASE_URL: "http://localhost:4000/v1",
+          LITELLM_API_BASE: "http://localhost:4000/v1/",
+        },
+        () => {
+          const config = resolveTtsConfig(baseCfg);
+          expect(config.openai.baseUrl).toBe("http://localhost:4000/v1");
+          expect(config.openai.model).toBe("gpt-4o-audio-preview");
+        },
+      );
+    });
+
+    it("keeps explicit OpenAI TTS model override even when using LiteLLM base", () => {
+      const cfg: OpenClawConfig = {
+        ...baseCfg,
+        messages: {
+          tts: { openai: { model: "tts-1-hd" } },
+        },
+      };
+      withEnv(
+        {
+          OPENAI_TTS_BASE_URL: "http://localhost:4000/v1",
+          LITELLM_API_BASE: "http://localhost:4000/v1",
+        },
+        () => {
+          const config = resolveTtsConfig(cfg);
+          expect(config.openai.model).toBe("tts-1-hd");
+        },
+      );
+    });
   });
 
   describe("textToSpeechTelephony – openai instructions", () => {

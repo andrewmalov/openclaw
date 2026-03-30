@@ -140,6 +140,7 @@ describe("plugin contract registry", () => {
     expect(findWebSearchIdsForPlugin("brave")).toEqual(["brave"]);
     expect(findWebSearchIdsForPlugin("firecrawl")).toEqual(["firecrawl"]);
     expect(findWebSearchIdsForPlugin("google")).toEqual(["gemini"]);
+    expect(findWebSearchIdsForPlugin("litellm")).toEqual(["litellm"]);
     expect(findWebSearchIdsForPlugin("moonshot")).toEqual(["kimi"]);
     expect(findWebSearchIdsForPlugin("perplexity")).toEqual(["perplexity"]);
     expect(findWebSearchIdsForPlugin("xai")).toEqual(["grok"]);
@@ -154,6 +155,7 @@ describe("plugin contract registry", () => {
   it("keeps bundled media-understanding ownership explicit", () => {
     expect(findMediaUnderstandingProviderIdsForPlugin("anthropic")).toEqual(["anthropic"]);
     expect(findMediaUnderstandingProviderIdsForPlugin("google")).toEqual(["google"]);
+    expect(findMediaUnderstandingProviderIdsForPlugin("litellm")).toEqual(["litellm"]);
     expect(findMediaUnderstandingProviderIdsForPlugin("minimax")).toEqual([
       "minimax",
       "minimax-portal",

@@ -10,6 +10,7 @@ vi.mock("./runtime.js", () => ({
   transcribeAudioFile: transcribeAudioFileFromRuntime,
 }));
 
+import { getDefaultAudioModelForProvider } from "./defaults.js";
 import { transcribeAudioFile } from "./transcribe-audio.js";
 
 describe("transcribeAudioFile", () => {
@@ -41,6 +42,10 @@ describe("transcribeAudioFile", () => {
     });
 
     expect(result).toEqual({ text: undefined });
+  });
+
+  it("uses bundled default audio model for litellm when resolving defaults", () => {
+    expect(getDefaultAudioModelForProvider("litellm")).toBe("gpt-4o-audio-preview");
   });
 
   it("propagates helper errors", async () => {

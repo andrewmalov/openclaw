@@ -5,11 +5,16 @@ import {
   AUTO_VIDEO_KEY_PROVIDERS,
   DEFAULT_AUDIO_MODELS,
   DEFAULT_IMAGE_MODELS,
+  getDefaultAudioModelForProvider,
 } from "./defaults.js";
 
 describe("DEFAULT_AUDIO_MODELS", () => {
   it("includes Mistral Voxtral default", () => {
     expect(DEFAULT_AUDIO_MODELS.mistral).toBe("voxtral-mini-latest");
+  });
+
+  it("exposes litellm default via helper", () => {
+    expect(getDefaultAudioModelForProvider("litellm")).toBe("gpt-4o-audio-preview");
   });
 });
 

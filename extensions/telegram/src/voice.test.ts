@@ -40,6 +40,18 @@ describe("resolveTelegramVoiceSend", () => {
     expect(logFallback).not.toHaveBeenCalled();
   });
 
+  it("keeps voice for OpenAI-style opus output used by LiteLLM TTS path", () => {
+    const logFallback = vi.fn();
+    const result = resolveTelegramVoiceSend({
+      wantsVoice: true,
+      contentType: "audio/ogg",
+      fileName: "tts.opus",
+      logFallback,
+    });
+    expect(result.useVoice).toBe(true);
+    expect(logFallback).not.toHaveBeenCalled();
+  });
+
   it.each([
     { contentType: "audio/mpeg", fileName: "track.mp3" },
     { contentType: "audio/mp4", fileName: "track.m4a" },

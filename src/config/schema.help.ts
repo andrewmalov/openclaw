@@ -1399,7 +1399,7 @@ export const FIELD_HELP: Record<string, string> = {
   "messages.removeAckAfterReply":
     "Removes the acknowledgment reaction after final reply delivery when enabled. Keep enabled for cleaner UX in channels where persistent ack reactions create clutter.",
   "messages.tts":
-    "Text-to-speech policy for reading agent replies aloud on supported voice or audio surfaces. Keep disabled unless voice playback is part of your operator/user workflow.",
+    "Text-to-speech policy for reading agent replies aloud on supported voice or audio surfaces. Keep disabled unless voice playback is part of your operator/user workflow. When using a LiteLLM OpenAI-compatible endpoint, if `messages.tts.openai` base URL matches `LITELLM_API_BASE` and no explicit OpenAI TTS model is set, synthesis defaults to `gpt-4o-audio-preview` for parity with inbound audio.",
   channels:
     "Channel provider configurations plus shared defaults that control access policies, heartbeat visibility, and per-surface behavior. Keep defaults centralized and override per provider only where required.",
   "channels.telegram":

@@ -109,3 +109,25 @@ export function requireTranscriptionText(
   }
   return text;
 }
+
+/**
+ * Maps low-level transcription errors to a short, user-safe message (no secrets).
+ */
+export function mapTranscriptionFailureToUserMessage(err: unknown): string {
+  if (err instanceof Error) {
+    const msg = err.message;
+    if (/aborted|AbortError|User aborted|signal/i.test(msg)) {
+      return "Audio transcription timed out. Try again with a shorter clip.";
+    }
+    if (/fetch failed|ENOTFOUND|ECONNREFUSED|getaddrinfo|network/i.test(msg)) {
+      return "Could not reach the transcription service. Check your connection and API settings.";
+    }
+    if (/HTTP 4\d\d/.test(msg)) {
+      return "The transcription service could not process this audio. The file may be unsupported or corrupted.";
+    }
+    if (/HTTP 5\d\d/.test(msg)) {
+      return "The transcription service is temporarily unavailable. Please try again.";
+    }
+  }
+  return "Audio transcription failed. Please try again.";
+}

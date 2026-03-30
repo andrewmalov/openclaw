@@ -527,8 +527,9 @@ describe("gateway server agent", () => {
       expect(res.ok).toBe(false);
       expect(res.error?.code).toBe("INVALID_REQUEST");
       expect(res.error?.message).toMatch(/size limit|exceeds/i);
-      expect(res.error?.details).toBeDefined();
-      expect((res.error?.details as { reason?: string })?.reason).toBe("size_exceeded");
+      const err = res.error as { details?: { reason?: string } } | undefined;
+      expect(err?.details).toBeDefined();
+      expect(err?.details?.reason).toBe("size_exceeded");
     } finally {
       testState.gatewayRpcAttachments = prevRpcAttachments;
     }

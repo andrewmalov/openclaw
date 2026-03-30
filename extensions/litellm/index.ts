@@ -4,12 +4,14 @@ import {
   getScopedCredentialValue,
   setScopedCredentialValue,
 } from "openclaw/plugin-sdk/provider-web-search";
+import { litellmMediaUnderstandingProvider } from "./media-understanding-provider.js";
 
 export default definePluginEntry({
   id: "litellm",
   name: "LiteLLM Plugin",
   description: "Bundled LiteLLM plugin (web search through LiteLLM Proxy)",
   register(api) {
+    api.registerMediaUnderstandingProvider(litellmMediaUnderstandingProvider);
     api.registerWebSearchProvider(
       createPluginBackedWebSearchProvider({
         id: "litellm",
