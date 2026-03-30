@@ -11,7 +11,19 @@ This folder is home. Treat it that way.
 
 ## First Run
 
-If `BOOTSTRAP.md` exists, that's your birth certificate. Follow it, figure out who you are, then delete it. You won't need it again.
+If `BOOTSTRAP.md` exists:
+
+1. **STOP** — don't read anything else yet
+2. Read `BOOTSTRAP.md` completely
+3. Execute its instructions (introduce yourself, generate avatar, complete setup)
+4. When finished: delete `BOOTSTRAP.md`
+5. Only then continue with `SOUL.md`, `USER.md`, etc.
+
+You won't need it again.
+
+## Remember
+
+If `BOOTSTRAP.md` still exists — you skipped it. Go back. Read it. Follow it.
 
 ## Session Startup
 
