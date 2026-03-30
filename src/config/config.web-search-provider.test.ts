@@ -105,6 +105,22 @@ describe("web search provider config", () => {
     expect(res.ok).toBe(true);
   });
 
+  it("accepts litellm provider and config", () => {
+    const res = validateConfigObject(
+      buildWebSearchProviderConfig({
+        enabled: true,
+        provider: "litellm",
+        providerConfig: {
+          apiKey: "sk-litellm", // pragma: allowlist secret
+          baseUrl: "http://localhost:4000/v1",
+          model: "tavily-search",
+        },
+      }),
+    );
+
+    expect(res.ok).toBe(true);
+  });
+
   it("accepts brave llm-context mode config", () => {
     const res = validateConfigObject(
       buildWebSearchProviderConfig({
@@ -144,8 +160,9 @@ describe("web search provider auto-detection", () => {
     delete process.env.PERPLEXITY_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.XAI_API_KEY;
-    delete process.env.KIMI_API_KEY;
-    delete process.env.MOONSHOT_API_KEY;
+    delete process.env.LITELLM_API_KEY;
+    delete process.env.LITELLM_API_BASE;
+    delete process.env.LITELLM_WEB_SEARCH_MODEL;
   });
 
   afterEach(() => {
@@ -160,6 +177,12 @@ describe("web search provider auto-detection", () => {
   it("auto-detects brave when only BRAVE_API_KEY is set", () => {
     process.env.BRAVE_API_KEY = "test-brave-key"; // pragma: allowlist secret
     expect(resolveSearchProvider({})).toBe("brave");
+  });
+
+  it("auto-detects litellm when LITELLM_API_KEY and LITELLM_API_BASE are set", () => {
+    process.env.LITELLM_API_KEY = "sk-litellm-test"; // pragma: allowlist secret
+    process.env.LITELLM_API_BASE = "https://litellm.test"; // pragma: allowlist secret
+    expect(resolveSearchProvider({})).toBe("litellm");
   });
 
   it("auto-detects gemini when only GEMINI_API_KEY is set", () => {

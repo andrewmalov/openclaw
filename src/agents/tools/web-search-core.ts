@@ -3,6 +3,7 @@ import { formatCliCommand } from "../../cli/command-format.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { normalizeResolvedSecretInputString } from "../../config/types.secrets.js";
 import { logVerbose } from "../../globals.js";
+import { resolveLitellmSearchBaseUrl } from "../../secrets/runtime-web-tools.js";
 import type { RuntimeWebSearchMetadata } from "../../secrets/runtime-web-tools.types.js";
 import { wrapWebContent } from "../../security/external-content.js";
 import { normalizeSecretInput } from "../../utils/normalize-secret-input.js";
@@ -22,7 +23,7 @@ import {
   writeCache,
 } from "./web-shared.js";
 
-const SEARCH_PROVIDERS = ["brave", "gemini", "grok", "kimi", "perplexity"] as const;
+const SEARCH_PROVIDERS = ["brave", "gemini", "grok", "kimi", "litellm", "perplexity"] as const;
 type SearchProvider = (typeof SEARCH_PROVIDERS)[number];
 const DEFAULT_SEARCH_COUNT = 5;
 const MAX_SEARCH_COUNT = 10;
@@ -607,6 +608,14 @@ function missingSearchKeyPayload(provider: (typeof SEARCH_PROVIDERS)[number]) {
       docs: "https://github.com/andrewmalov/openclaw",
     };
   }
+  if (provider === "litellm") {
+    return {
+      error: "missing_litellm_api_key",
+      message:
+        "web_search (litellm) needs a LiteLLM API key. Set LITELLM_API_KEY in the agent environment, or configure tools.web.search.litellm.apiKey.",
+      docs: "https://github.com/andrewmalov/openclaw",
+    };
+  }
   return {
     error: "missing_perplexity_api_key",
     message:
@@ -619,7 +628,83 @@ function isSearchProvider(value: string): value is SearchProvider {
   return SEARCH_PROVIDERS.includes(value as SearchProvider);
 }
 
-function resolveSearchProvider(search?: WebSearchConfig): (typeof SEARCH_PROVIDERS)[number] {
+function resolveBraveConfig(search?: WebSearchConfig): BraveConfig {
+  if (!search || typeof search !== "object") {
+    return {};
+  }
+  const brave = "brave" in search ? search.brave : undefined;
+  if (!brave || typeof brave !== "object") {
+    return {};
+  }
+  return brave as BraveConfig;
+}
+
+function resolveBraveMode(brave: BraveConfig): "web" | "llm-context" {
+  return brave.mode === "llm-context" ? "llm-context" : "web";
+}
+
+type LitellmConfig = {
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+};
+
+function resolveLitellmConfig(search?: WebSearchConfig): LitellmConfig {
+  if (!search || typeof search !== "object") {
+    return {};
+  }
+  const litellm = "litellm" in search ? search.litellm : undefined;
+  if (!litellm || typeof litellm !== "object") {
+    return {};
+  }
+  return litellm as LitellmConfig;
+}
+
+function resolveLitellmApiKey(search?: WebSearchConfig): string | undefined {
+  const litellm = resolveLitellmConfig(search);
+  const fromConfigRaw = normalizeResolvedSecretInputString({
+    value: litellm.apiKey,
+    path: "tools.web.search.litellm.apiKey",
+  });
+  const fromConfig = normalizeSecretInput(fromConfigRaw);
+  const fromEnv = normalizeSecretInput(process.env.LITELLM_API_KEY);
+  return fromConfig || fromEnv || undefined;
+}
+
+function resolveLitellmModel(search?: WebSearchConfig): string | undefined {
+  const litellm = resolveLitellmConfig(search);
+  const fromConfig = typeof litellm.model === "string" ? litellm.model.trim() : "";
+  if (fromConfig) {
+    return fromConfig;
+  }
+  return normalizeSecretInput(process.env.LITELLM_WEB_SEARCH_MODEL) || undefined;
+}
+
+function resolveLitellmBaseForTool(
+  search: WebSearchConfig | undefined,
+  fullConfig: OpenClawConfig | undefined,
+): string | undefined {
+  if (!fullConfig) {
+    const envOnly = normalizeSecretInput(process.env.LITELLM_API_BASE);
+    if (envOnly) {
+      return envOnly.trim().replace(/\/$/, "");
+    }
+    const litellm = resolveLitellmConfig(search);
+    const cfgBase = typeof litellm.baseUrl === "string" ? litellm.baseUrl.trim() : "";
+    return cfgBase ? cfgBase.replace(/\/$/, "") : undefined;
+  }
+  const searchRecord = (search ?? {}) as Record<string, unknown>;
+  return resolveLitellmSearchBaseUrl({
+    sourceConfig: fullConfig,
+    env: process.env,
+    search: searchRecord,
+  });
+}
+
+function resolveSearchProvider(
+  search?: WebSearchConfig,
+  fullConfig?: OpenClawConfig,
+): (typeof SEARCH_PROVIDERS)[number] {
   const raw =
     search && "provider" in search && typeof search.provider === "string"
       ? search.provider.trim().toLowerCase()
@@ -636,20 +721,26 @@ function resolveSearchProvider(search?: WebSearchConfig): (typeof SEARCH_PROVIDE
   if (raw === "kimi") {
     return "kimi";
   }
+  if (raw === "litellm") {
+    return "litellm";
+  }
   if (raw === "perplexity") {
     return "perplexity";
   }
 
-  // Auto-detect provider from available API keys (alphabetical order)
   if (raw === "") {
-    // Brave
+    if (resolveLitellmApiKey(search) && resolveLitellmBaseForTool(search, fullConfig)) {
+      logVerbose(
+        'web_search: no provider configured, auto-detected "litellm" from LITELLM_API_KEY and a resolved LiteLLM base URL',
+      );
+      return "litellm";
+    }
     if (resolveSearchApiKey(search)) {
       logVerbose(
         'web_search: no provider configured, auto-detected "brave" from available API keys',
       );
       return "brave";
     }
-    // Gemini
     const geminiConfig = resolveGeminiConfig(search);
     if (resolveGeminiApiKey(geminiConfig)) {
       logVerbose(
@@ -657,7 +748,6 @@ function resolveSearchProvider(search?: WebSearchConfig): (typeof SEARCH_PROVIDE
       );
       return "gemini";
     }
-    // Grok
     const grokConfig = resolveGrokConfig(search);
     if (resolveGrokApiKey(grokConfig)) {
       logVerbose(
@@ -665,7 +755,6 @@ function resolveSearchProvider(search?: WebSearchConfig): (typeof SEARCH_PROVIDE
       );
       return "grok";
     }
-    // Kimi
     const kimiConfig = resolveKimiConfig(search);
     if (resolveKimiApiKey(kimiConfig)) {
       logVerbose(
@@ -673,7 +762,6 @@ function resolveSearchProvider(search?: WebSearchConfig): (typeof SEARCH_PROVIDE
       );
       return "kimi";
     }
-    // Perplexity
     const perplexityConfig = resolvePerplexityConfig(search);
     const { apiKey: perplexityKey } = resolvePerplexityApiKey(perplexityConfig);
     if (perplexityKey) {
@@ -685,21 +773,6 @@ function resolveSearchProvider(search?: WebSearchConfig): (typeof SEARCH_PROVIDE
   }
 
   return "brave";
-}
-
-function resolveBraveConfig(search?: WebSearchConfig): BraveConfig {
-  if (!search || typeof search !== "object") {
-    return {};
-  }
-  const brave = "brave" in search ? search.brave : undefined;
-  if (!brave || typeof brave !== "object") {
-    return {};
-  }
-  return brave as BraveConfig;
-}
-
-function resolveBraveMode(brave: BraveConfig): "web" | "llm-context" {
-  return brave.mode === "llm-context" ? "llm-context" : "web";
 }
 
 function resolvePerplexityConfig(search?: WebSearchConfig): PerplexityConfig {
@@ -1320,6 +1393,133 @@ async function runPerplexitySearch(params: {
   );
 }
 
+function tryParseLitellmStructuredRow(row: Record<string, unknown>): {
+  title: string;
+  url: string;
+  description: string;
+  siteName?: string;
+} | null {
+  const url = typeof row.url === "string" ? row.url.trim() : "";
+  if (!url) {
+    return null;
+  }
+  const title = typeof row.title === "string" ? row.title : "";
+  const snippet =
+    typeof row.snippet === "string"
+      ? row.snippet
+      : typeof row.description === "string"
+        ? row.description
+        : "";
+  const siteNameRaw = typeof row.siteName === "string" ? row.siteName : resolveSiteName(url);
+  return {
+    title: title ? wrapWebContent(title, "web_search") : "",
+    url,
+    description: snippet ? wrapWebContent(snippet, "web_search") : "",
+    siteName: siteNameRaw || undefined,
+  };
+}
+
+function tryParseLitellmStructuredResults(content: string): Array<{
+  title: string;
+  url: string;
+  description: string;
+  siteName?: string;
+}> | null {
+  const trimmed = content.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    const rowsRaw = Array.isArray(parsed)
+      ? parsed
+      : typeof parsed === "object" &&
+          parsed !== null &&
+          Array.isArray((parsed as Record<string, unknown>).results)
+        ? ((parsed as Record<string, unknown>).results as unknown[])
+        : null;
+    if (!rowsRaw || rowsRaw.length === 0) {
+      return null;
+    }
+    const out: Array<{ title: string; url: string; description: string; siteName?: string }> = [];
+    for (const row of rowsRaw) {
+      if (typeof row !== "object" || row === null) {
+        continue;
+      }
+      const mapped = tryParseLitellmStructuredRow(row as Record<string, unknown>);
+      if (mapped) {
+        out.push(mapped);
+      }
+    }
+    return out.length > 0 ? out : null;
+  } catch {
+    return null;
+  }
+}
+
+async function runLitellmWebSearch(params: {
+  query: string;
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  timeoutSeconds: number;
+}): Promise<
+  | {
+      kind: "structured";
+      results: Array<{ title: string; url: string; description: string; siteName?: string }>;
+    }
+  | { kind: "chat"; content: string; citations: string[] }
+> {
+  const baseUrl = params.baseUrl.trim().replace(/\/$/, "");
+  const endpoint = `${baseUrl}/chat/completions`;
+
+  return withTrustedWebSearchEndpoint(
+    {
+      url: endpoint,
+      timeoutSeconds: params.timeoutSeconds,
+      init: {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${params.apiKey}`,
+          "HTTP-Referer": "https://openclaw.ai",
+          "X-Title": "OpenClaw Web Search",
+        },
+        body: JSON.stringify({
+          model: params.model,
+          messages: [{ role: "user", content: params.query }],
+          temperature: 0,
+        }),
+      },
+    },
+    async (res) => {
+      if (!res.ok) {
+        return await throwWebSearchApiError(res, "LiteLLM");
+      }
+
+      const data = (await res.json()) as PerplexitySearchResponse;
+      const messageContent = data.choices?.[0]?.message?.content;
+      const content =
+        typeof messageContent === "string"
+          ? messageContent
+          : messageContent !== undefined
+            ? JSON.stringify(messageContent)
+            : "";
+      const structured =
+        content.trim().length > 0 ? tryParseLitellmStructuredResults(content) : null;
+      if (structured && structured.length > 0) {
+        return { kind: "structured" as const, results: structured };
+      }
+      const citations = extractPerplexityCitations(data);
+      return {
+        kind: "chat" as const,
+        content: content.trim() ? content : "No response",
+        citations,
+      };
+    },
+  );
+}
+
 async function runGrokSearch(params: {
   query: string;
   apiKey: string;
@@ -1621,6 +1821,8 @@ async function runWebSearch(params: {
   kimiBaseUrl?: string;
   kimiModel?: string;
   braveMode?: "web" | "llm-context";
+  litellmBaseUrl?: string;
+  litellmModel?: string;
 }): Promise<Record<string, unknown>> {
   const effectiveBraveMode = params.braveMode ?? "web";
   const providerSpecificKey =
@@ -1632,7 +1834,9 @@ async function runWebSearch(params: {
           ? (params.geminiModel ?? DEFAULT_GEMINI_MODEL)
           : params.provider === "kimi"
             ? `${params.kimiBaseUrl ?? DEFAULT_KIMI_BASE_URL}:${params.kimiModel ?? DEFAULT_KIMI_MODEL}`
-            : "";
+            : params.provider === "litellm"
+              ? `${params.litellmBaseUrl ?? ""}:${params.litellmModel ?? ""}`
+              : "";
   const cacheKey = normalizeCacheKey(
     params.provider === "brave" && effectiveBraveMode === "llm-context"
       ? `${params.provider}:llm-context:${params.query}:${params.country || "default"}:${params.search_lang || params.language || "default"}:${params.freshness || "default"}`
@@ -1787,6 +1991,54 @@ async function runWebSearch(params: {
     return payload;
   }
 
+  if (params.provider === "litellm") {
+    const base = params.litellmBaseUrl?.trim() ?? "";
+    const model = params.litellmModel?.trim() ?? "";
+    if (!base || !model) {
+      throw new Error("LiteLLM web search requires base URL and model.");
+    }
+    const outcome = await runLitellmWebSearch({
+      query: params.query,
+      apiKey: params.apiKey,
+      baseUrl: base,
+      model,
+      timeoutSeconds: params.timeoutSeconds,
+    });
+    if (outcome.kind === "structured") {
+      const payload = {
+        query: params.query,
+        provider: params.provider,
+        count: outcome.results.length,
+        tookMs: Date.now() - start,
+        externalContent: {
+          untrusted: true,
+          source: "web_search",
+          provider: params.provider,
+          wrapped: true,
+        },
+        results: outcome.results,
+      };
+      writeCache(SEARCH_CACHE, cacheKey, payload, params.cacheTtlMs);
+      return payload;
+    }
+    const payload = {
+      query: params.query,
+      provider: params.provider,
+      model,
+      tookMs: Date.now() - start,
+      externalContent: {
+        untrusted: true,
+        source: "web_search",
+        provider: params.provider,
+        wrapped: true,
+      },
+      content: wrapWebContent(outcome.content, "web_search"),
+      citations: outcome.citations,
+    };
+    writeCache(SEARCH_CACHE, cacheKey, payload, params.cacheTtlMs);
+    return payload;
+  }
+
   if (params.provider !== "brave") {
     throw new Error("Unsupported web search provider.");
   }
@@ -1921,7 +2173,7 @@ export function createWebSearchTool(options?: {
   const provider =
     runtimeProviderCandidate && isSearchProvider(runtimeProviderCandidate)
       ? runtimeProviderCandidate
-      : resolveSearchProvider(search);
+      : resolveSearchProvider(search, options?.config);
   const perplexityConfig = resolvePerplexityConfig(search);
   const perplexitySchemaTransportHint =
     options?.runtimeWebSearch?.perplexityTransport ??
@@ -1933,19 +2185,24 @@ export function createWebSearchTool(options?: {
   const braveMode = resolveBraveMode(braveConfig);
 
   const description =
-    provider === "perplexity"
-      ? perplexitySchemaTransportHint === "chat_completions"
-        ? "Search the web using Perplexity Sonar via Perplexity/OpenRouter chat completions. Returns AI-synthesized answers with citations from web-grounded search."
-        : "Search the web using Perplexity. Runtime routing decides between native Search API and Sonar chat-completions compatibility. Structured filters are available on the native Search API path."
-      : provider === "grok"
-        ? "Search the web using xAI Grok. Returns AI-synthesized answers with citations from real-time web search."
-        : provider === "kimi"
-          ? "Search the web using Kimi by Moonshot. Returns AI-synthesized answers with citations from native $web_search."
-          : provider === "gemini"
-            ? "Search the web using Gemini with Google Search grounding. Returns AI-synthesized answers with citations from Google Search."
-            : braveMode === "llm-context"
-              ? "Search the web using Brave Search LLM Context API. Returns pre-extracted page content (text chunks, tables, code blocks) optimized for LLM grounding."
-              : "Search the web using Brave Search API. Supports region-specific and localized search via country and language parameters. Returns titles, URLs, and snippets for fast research.";
+    provider === "litellm"
+      ? "Search the web using LiteLLM Proxy. Uses OpenAI-compatible chat completions against a model or route you configure in LiteLLM (for example Perplexity, Tavily, or Brave). Returns structured JSON results when the model returns them, otherwise synthesized text with citations."
+      : provider === "perplexity"
+        ? perplexitySchemaTransportHint === "chat_completions"
+          ? "Search the web using Perplexity Sonar via Perplexity/OpenRouter chat completions. Returns AI-synthesized answers with citations from web-grounded search."
+          : "Search the web using Perplexity. Runtime routing decides between native Search API and Sonar chat-completions compatibility. Structured filters are available on the native Search API path."
+        : provider === "grok"
+          ? "Search the web using xAI Grok. Returns AI-synthesized answers with citations from real-time web search."
+          : provider === "kimi"
+            ? "Search the web using Kimi by Moonshot. Returns AI-synthesized answers with citations from native $web_search."
+            : provider === "gemini"
+              ? "Search the web using Gemini with Google Search grounding. Returns AI-synthesized answers with citations from Google Search."
+              : braveMode === "llm-context"
+                ? "Search the web using Brave Search LLM Context API. Returns pre-extracted page content (text chunks, tables, code blocks) optimized for LLM grounding."
+                : "Search the web using Brave Search API. Supports region-specific and localized search via country and language parameters. Returns titles, URLs, and snippets for fast research.";
+
+  const litellmBaseForTool = resolveLitellmBaseForTool(search, options?.config);
+  const litellmModelForTool = resolveLitellmModel(search);
 
   return {
     label: "Web Search",
@@ -1969,10 +2226,29 @@ export function createWebSearchTool(options?: {
               ? resolveKimiApiKey(kimiConfig)
               : provider === "gemini"
                 ? resolveGeminiApiKey(geminiConfig)
-                : resolveSearchApiKey(search);
+                : provider === "litellm"
+                  ? resolveLitellmApiKey(search)
+                  : resolveSearchApiKey(search);
 
       if (!apiKey) {
         return jsonResult(missingSearchKeyPayload(provider));
+      }
+
+      if (provider === "litellm" && !litellmBaseForTool) {
+        return jsonResult({
+          error: "missing_litellm_base_url",
+          message:
+            "web_search (litellm) needs a LiteLLM base URL. Set LITELLM_API_BASE in the agent environment, or tools.web.search.litellm.baseUrl, or models.providers.litellm.baseUrl.",
+          docs: "https://github.com/andrewmalov/openclaw",
+        });
+      }
+      if (provider === "litellm" && !litellmModelForTool) {
+        return jsonResult({
+          error: "missing_litellm_web_search_model",
+          message:
+            "web_search (litellm) needs a model or route name. Set tools.web.search.litellm.model or LITELLM_WEB_SEARCH_MODEL to match a search-capable route in LiteLLM.",
+          docs: "https://github.com/andrewmalov/openclaw",
+        });
       }
 
       const supportsStructuredPerplexityFilters =
@@ -2206,6 +2482,8 @@ export function createWebSearchTool(options?: {
         kimiBaseUrl: resolveKimiBaseUrl(kimiConfig),
         kimiModel: resolveKimiModel(kimiConfig),
         braveMode,
+        litellmBaseUrl: litellmBaseForTool,
+        litellmModel: litellmModelForTool,
       });
       return jsonResult(result);
     },

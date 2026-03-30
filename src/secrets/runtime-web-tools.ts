@@ -295,6 +295,35 @@ function keyPathForProvider(provider: WebSearchProvider): string {
   return provider === "brave" ? "tools.web.search.apiKey" : `tools.web.search.${provider}.apiKey`;
 }
 
+/** Base URL for LiteLLM web_search: env first, then tools.web.search.litellm.baseUrl, then models.providers.litellm.baseUrl */
+export function resolveLitellmSearchBaseUrl(params: {
+  sourceConfig: OpenClawConfig;
+  env: NodeJS.ProcessEnv;
+  search: Record<string, unknown>;
+}): string | undefined {
+  const envBase = normalizeSecretInput(params.env.LITELLM_API_BASE);
+  if (envBase) {
+    return envBase.trim().replace(/\/$/, "");
+  }
+  const litellm = params.search.litellm;
+  if (isRecord(litellm) && typeof litellm.baseUrl === "string") {
+    const trimmed = litellm.baseUrl.trim();
+    if (trimmed) {
+      return trimmed.replace(/\/$/, "");
+    }
+  }
+  const litellmProvider = params.sourceConfig.models?.providers?.litellm as
+    | { baseUrl?: unknown }
+    | undefined;
+  if (typeof litellmProvider?.baseUrl === "string") {
+    const trimmed = litellmProvider.baseUrl.trim();
+    if (trimmed) {
+      return trimmed.replace(/\/$/, "");
+    }
+  }
+  return undefined;
+}
+
 function hasConfiguredSecretRef(value: unknown, defaults: SecretDefaults | undefined): boolean {
   return Boolean(
     resolveSecretInputRef({
@@ -419,6 +448,16 @@ export async function resolveRuntimeWebTools(params: {
       }
 
       if (resolution.value) {
+        if (provider.id === "litellm") {
+          const litellmBase = resolveLitellmSearchBaseUrl({
+            sourceConfig: params.sourceConfig,
+            env: params.context.env,
+            search,
+          });
+          if (!litellmBase) {
+            continue;
+          }
+        }
         selectedProvider = provider.id;
         selectedResolution = resolution;
         setResolvedWebSearchApiKey({
@@ -430,6 +469,34 @@ export async function resolveRuntimeWebTools(params: {
         });
         break;
       }
+    }
+
+    if (
+      searchEnabled &&
+      search &&
+      configuredProvider === "litellm" &&
+      selectedProvider === "litellm" &&
+      selectedResolution?.value &&
+      !resolveLitellmSearchBaseUrl({
+        sourceConfig: params.sourceConfig,
+        env: params.context.env,
+        search,
+      })
+    ) {
+      const diagnostic: RuntimeWebDiagnostic = {
+        code: "WEB_SEARCH_KEY_UNRESOLVED_NO_FALLBACK",
+        message:
+          'tools.web.search.provider is "litellm" but no LiteLLM base URL was resolved. Set LITELLM_API_BASE in the agent environment, or set tools.web.search.litellm.baseUrl, or models.providers.litellm.baseUrl.',
+        path: "LITELLM_API_BASE",
+      };
+      diagnostics.push(diagnostic);
+      searchMetadata.diagnostics.push(diagnostic);
+      pushWarning(params.context, {
+        code: "WEB_SEARCH_KEY_UNRESOLVED_NO_FALLBACK",
+        path: "LITELLM_API_BASE",
+        message: diagnostic.message,
+      });
+      throw new Error(`[WEB_SEARCH_LITELLM_MISSING_BASE] ${diagnostic.message}`);
     }
 
     const failUnresolvedSearchNoFallback = (unresolved: { path: string; reason: string }) => {

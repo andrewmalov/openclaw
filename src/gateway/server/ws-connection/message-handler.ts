@@ -1166,8 +1166,14 @@ function getRawDataByteLength(data: unknown): number {
 }
 
 function setSocketMaxPayload(socket: WebSocket, maxPayload: number): void {
+  // Patch both receiver (incoming) and sender (outgoing) _maxPayload so that
+  // large responses (e.g. chat.history with base64 images) don't get 1009 errors.
   const receiver = (socket as { _receiver?: { _maxPayload?: number } })._receiver;
   if (receiver) {
     receiver._maxPayload = maxPayload;
+  }
+  const sender = (socket as { _sender?: { _maxPayload?: number } })._sender;
+  if (sender) {
+    sender._maxPayload = maxPayload;
   }
 }

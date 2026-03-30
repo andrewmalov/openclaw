@@ -108,6 +108,41 @@ curl -X POST "http://localhost:4000/key/generate" \
 
 Use the generated key as `LITELLM_API_KEY`.
 
+## Web search (`web_search` tool)
+
+You can route the agent **`web_search`** tool through LiteLLM so upstream search APIs (Perplexity, Tavily, Brave, and others) are configured only in LiteLLM.
+
+### Environment variables
+
+```bash
+export LITELLM_API_KEY="your-litellm-key"
+export LITELLM_API_BASE="http://localhost:4000/v1"
+```
+
+Optional: `LITELLM_WEB_SEARCH_MODEL` if you do not set `tools.web.search.litellm.model` in config.
+
+### Config example
+
+```json5
+{
+  tools: {
+    web: {
+      search: {
+        enabled: true,
+        provider: "litellm",
+        litellm: {
+          model: "my-search-route",
+        },
+      },
+    },
+  },
+}
+```
+
+The **`model`** value must match a LiteLLM route or model name that performs web search. Base URL resolution order: `LITELLM_API_BASE`, then `tools.web.search.litellm.baseUrl`, then `models.providers.litellm.baseUrl`.
+
+When both `LITELLM_API_KEY` and `LITELLM_API_BASE` are set and `tools.web.search.provider` is omitted, OpenClaw **prefers** the `litellm` search provider over other bundled providers (for example Brave).
+
 ## Model routing
 
 LiteLLM can route model requests to different backends. Configure in your LiteLLM `config.yaml`:

@@ -6,7 +6,7 @@ alwaysApply: true
 
 # openclaw-base Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-22
+Auto-generated from all feature plans. Last updated: 2026-03-29
 
 ## Active Technologies
 - TypeScript (ESM), Node 22+ + Existing provider runtime in `src/plugins/*`, model/provider config types in `src/config/*`, onboarding auth flow in `src/commands/*`, plugin-sdk provider contracts, existing OpenAI-compatible provider patterns (OpenRouter, custom, onboarding LiteLLM defaults) (002-litellm-proxy-provider)
@@ -15,6 +15,10 @@ Auto-generated from all feature plans. Last updated: 2026-03-22
 - Session transcripts (JSONL) under configured store path; no new DB. Outgoing inline files are read from agent output paths or existing reply payload and embedded in RPC response. (001-gateway-rpc-file-transfer)
 - TypeScript (ESM), Node 22+ + Existing Gateway + agent stack; `src/infra/outbound/channel-selection.ts`, `src/infra/outbound/message-action-runner.ts`, `src/infra/outbound/channel-resolution.ts`, `src/agents/tools/message-tool.ts`, `src/utils/message-channel.ts` (`INTERNAL_MESSAGE_CHANNEL`, `listGatewayMessageChannels`) (003-webchat-default-priority)
 - No new persistence; session/transcript behavior unchanged except successful delivery paths. (003-webchat-default-priority)
+- TypeScript (ESM), Node 22+ + Existing `web_search` stack (`src/agents/tools/web-search-core.ts`, `src/web-search/runtime.ts`), bundled web-search plugins (`src/plugins/web-search-providers.ts`, `extensions/*`), secrets/runtime resolution (`src/secrets/runtime-web-tools.ts`, `src/secrets/runtime-web-tools.types.ts`), config Zod (`src/config/zod-schema.agent-runtime.ts`, `src/config/types.tools.ts`) (007-litellm-web-search)
+- No new persistence; optional in-memory cache reuse (existing web search cache) (007-litellm-web-search)
+- TypeScript (ESM), Node 22+ + Existing `web_search` stack (`src/agents/tools/web-search-core.ts`, `src/web-search/runtime.ts`), bundled web-search plugins (`src/plugins/web-search-providers.ts`, `extensions/*`), secrets/runtime resolution (`src/secrets/runtime-web-tools.ts`, `src/secrets/runtime-web-tools.types.ts`), config Zod (`src/config/zod-schema.agent-runtime.ts`, `src/config/types.tools.ts`) (007-litellm-web-search)
+- No new persistence; reuse existing in-memory web search cache where applicable (007-litellm-web-search)
 
 - TypeScript (ESM), Node 22+ + Existing Gateway stack (WebSocket, Pi session transcripts, config), `src/media` (base64, MIME), `src/web/media` (loadWebMedia for URL fetch if attachmentRefs), `src/telegram/format` (HTML for reply text) (001-gateway-rpc-file-transfer)
 
@@ -34,9 +38,9 @@ npm test && npm run lint
 TypeScript (ESM), Node 22+: Follow standard conventions
 
 ## Recent Changes
+- 007-litellm-web-search: Added TypeScript (ESM), Node 22+ + Existing `web_search` stack (`src/agents/tools/web-search-core.ts`, `src/web-search/runtime.ts`), bundled web-search plugins (`src/plugins/web-search-providers.ts`, `extensions/*`), secrets/runtime resolution (`src/secrets/runtime-web-tools.ts`, `src/secrets/runtime-web-tools.types.ts`), config Zod (`src/config/zod-schema.agent-runtime.ts`, `src/config/types.tools.ts`)
+- 007-litellm-web-search: Added TypeScript (ESM), Node 22+ + Existing `web_search` stack (`src/agents/tools/web-search-core.ts`, `src/web-search/runtime.ts`), bundled web-search plugins (`src/plugins/web-search-providers.ts`, `extensions/*`), secrets/runtime resolution (`src/secrets/runtime-web-tools.ts`, `src/secrets/runtime-web-tools.types.ts`), config Zod (`src/config/zod-schema.agent-runtime.ts`, `src/config/types.tools.ts`)
 - 003-webchat-default-priority: Added TypeScript (ESM), Node 22+ + Existing Gateway + agent stack; `src/infra/outbound/channel-selection.ts`, `src/infra/outbound/message-action-runner.ts`, `src/infra/outbound/channel-resolution.ts`, `src/agents/tools/message-tool.ts`, `src/utils/message-channel.ts` (`INTERNAL_MESSAGE_CHANNEL`, `listGatewayMessageChannels`)
-- 001-gateway-rpc-file-transfer: Added TypeScript (ESM), Node 22+ + Existing Gateway stack (WebSocket, Pi session transcripts, config), `src/media` (base64, MIME), `src/web/media` (loadWebMedia for URL fetch if attachmentRefs), `src/telegram/format` (HTML for reply text), `src/infra/outbound/message-action-runner` (message tool inline relay with mediaUrl)
-- 002-litellm-proxy-provider: Added TypeScript (ESM), Node 22+ + Existing provider runtime in `src/plugins/*`, model/provider config types in `src/config/*`, onboarding auth flow in `src/commands/*`, plugin-sdk provider contracts, existing OpenAI-compatible provider patterns (OpenRouter, custom, onboarding LiteLLM defaults)
 
 
 <!-- MANUAL ADDITIONS START -->
