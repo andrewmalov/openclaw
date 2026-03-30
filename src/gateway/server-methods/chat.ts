@@ -1213,17 +1213,31 @@ function broadcastChatFinal(params: {
   runId: string;
   sessionKey: string;
   message?: Record<string, unknown>;
+  mediaUrl?: string;
+  mediaUrls?: string[];
 }) {
   const seq = nextChatSeq({ agentRunSeq: params.context.agentRunSeq }, params.runId);
   const strippedEnvelopeMessage = stripEnvelopeFromMessage(params.message) as
     | Record<string, unknown>
     | undefined;
+  const content: Record<string, unknown>[] = [];
+  const msg = stripInlineDirectiveTagsFromMessageForDisplay(strippedEnvelopeMessage);
+  if (msg) {
+    content.push(msg);
+  }
+  if (params.mediaUrl) {
+    content.push({ type: "audio", url: params.mediaUrl });
+  } else if (params.mediaUrls) {
+    for (const url of params.mediaUrls) {
+      content.push({ type: "audio", url });
+    }
+  }
   const payload = {
     runId: params.runId,
     sessionKey: params.sessionKey,
     seq,
     state: "final" as const,
-    message: stripInlineDirectiveTagsFromMessageForDisplay(strippedEnvelopeMessage),
+    message: content.length > 0 ? { role: "assistant", content, timestamp: Date.now() } : undefined,
   };
   params.context.broadcast("chat", payload);
   params.context.nodeSendToSession(params.sessionKey, "chat", payload);
@@ -1761,13 +1775,22 @@ export const chatHandlers: GatewayRequestHandlers = {
                 sessionKey: rawSessionKey,
               });
             } else {
-              const combinedReply = deliveredReplies
-                .filter((entry) => entry.kind === "final")
+              const finalReplies = deliveredReplies.filter((entry) => entry.kind === "final");
+              const combinedReply = finalReplies
                 .map((entry) => entry.payload)
                 .map((part) => part.text?.trim() ?? "")
                 .filter(Boolean)
                 .join("\n\n")
                 .trim();
+              // Preserve media from the last final reply (e.g. TTS audioUrl).
+              const lastFinalMediaUrl =
+                finalReplies.length > 0
+                  ? finalReplies[finalReplies.length - 1].payload.mediaUrl
+                  : undefined;
+              const lastFinalMediaUrls =
+                finalReplies.length > 0
+                  ? finalReplies[finalReplies.length - 1].payload.mediaUrls
+                  : undefined;
               let message: Record<string, unknown> | undefined;
               if (combinedReply) {
                 const { storePath: latestStorePath, entry: latestEntry } =
@@ -1804,6 +1827,8 @@ export const chatHandlers: GatewayRequestHandlers = {
                 runId: clientRunId,
                 sessionKey: rawSessionKey,
                 message,
+                mediaUrl: lastFinalMediaUrl,
+                mediaUrls: lastFinalMediaUrls,
               });
             }
           }

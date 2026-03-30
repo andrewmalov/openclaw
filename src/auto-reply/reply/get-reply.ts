@@ -141,6 +141,16 @@ export async function getReplyFromConfig(
       ctx: finalized,
       cfg,
     });
+    // Mirror InboundAttachments MIME types into MediaTypes so downstream
+    // isInboundAudioContext() can detect audio from RPC/gateway attachments.
+    if (finalized.InboundAttachments?.length) {
+      const mimeTypes = finalized.InboundAttachments.map((att) => att.mimeType).filter(
+        (m): m is string => typeof m === "string" && m.trim().length > 0,
+      );
+      if (mimeTypes.length > 0) {
+        finalized.MediaTypes = mimeTypes;
+      }
+    }
   }
   emitPreAgentMessageHooks({
     ctx: finalized,
