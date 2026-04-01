@@ -4,7 +4,7 @@
 
 ## Goal
 
-Validate that voice input transcription and voice reply generation work through LiteLLM, with default model `gpt-4o-audio-preview`.
+Validate that voice input transcription and voice reply generation work through LiteLLM, with default model `gpt-4o-mini-transcribe`.
 
 ## Prerequisites
 
@@ -15,13 +15,13 @@ Validate that voice input transcription and voice reply generation work through 
 ## 1) Configure runtime for LiteLLM voice path
 
 - Ensure LiteLLM credentials/base URL are available to the running process (`LITELLM_API_KEY`, `LITELLM_API_BASE` pointing at the proxy `/v1` root).
-- Optionally set `tools.media.audio.models` (or `messages.tts.openai`) to override defaults; leave models unset to verify **`gpt-4o-audio-preview`** fallback for both transcription and TTS when the OpenAI-compatible base matches LiteLLM.
+- Optionally set `tools.media.audio.models` (or `messages.tts.openai`) to override defaults; leave models unset to verify **`gpt-4o-mini-transcribe`** fallback for transcription and **`gpt-4o-audio-preview`** for TTS when the OpenAI-compatible base matches LiteLLM.
 
 ## 2) Validate inbound transcription default
 
 1. Send a short voice message in a supported channel.
 2. Confirm transcript-driven assistant response appears.
-3. Verify diagnostics/model resolution show `gpt-4o-audio-preview` when no model override is configured.
+3. Verify diagnostics/model resolution show `gpt-4o-mini-transcribe` when no model override is configured.
 
 ## 3) Validate outbound voice generation default
 
@@ -45,6 +45,6 @@ Validate that voice input transcription and voice reply generation work through 
 
 - Voice recognition works through LiteLLM.
 - Voice generation works through LiteLLM.
-- Default model is `gpt-4o-audio-preview` when unspecified.
+- Default STT model is `gpt-4o-mini-transcribe` when unspecified.
 - Explicit model overrides take precedence.
 - Failures are explicit and safe, with text fallback preserved.

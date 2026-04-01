@@ -14,7 +14,7 @@ describe("DEFAULT_AUDIO_MODELS", () => {
   });
 
   it("exposes litellm default via helper", () => {
-    expect(getDefaultAudioModelForProvider("litellm")).toBe("gpt-4o-audio-preview");
+    expect(getDefaultAudioModelForProvider("litellm")).toBe("gpt-4o-mini-transcribe");
   });
 });
 

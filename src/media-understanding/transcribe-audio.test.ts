@@ -45,7 +45,7 @@ describe("transcribeAudioFile", () => {
   });
 
   it("uses bundled default audio model for litellm when resolving defaults", () => {
-    expect(getDefaultAudioModelForProvider("litellm")).toBe("gpt-4o-audio-preview");
+    expect(getDefaultAudioModelForProvider("litellm")).toBe("gpt-4o-mini-transcribe");
   });
 
   it("propagates helper errors", async () => {

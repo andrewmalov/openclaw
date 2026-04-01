@@ -260,7 +260,7 @@ describe("runCapability auto audio entries", () => {
     }
     expect(runResult.decision.outcome).toBe("success");
     expect(runResult.outputs[0]?.provider).toBe("litellm");
-    expect(runResult.outputs[0]?.model).toBe("gpt-4o-audio-preview");
+    expect(runResult.outputs[0]?.model).toBe("gpt-4o-mini-transcribe");
     expect(runResult.outputs[0]?.text).toBe("from-litellm");
   });
 });

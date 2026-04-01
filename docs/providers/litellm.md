@@ -145,7 +145,7 @@ When both `LITELLM_API_KEY` and `LITELLM_API_BASE` are set and `tools.web.search
 
 ## Voice messages (inbound transcription + outbound TTS)
 
-When `LITELLM_API_KEY` is set, OpenClaw can route **inbound voice** transcription through the bundled LiteLLM media provider (OpenAI-compatible `/audio/transcriptions`). The default transcription model is **`gpt-4o-audio-preview`** unless you override it under `tools.media.audio.models` or your agent media settings.
+When `LITELLM_API_KEY` is set, OpenClaw can route **inbound voice** transcription through the bundled LiteLLM media provider (OpenAI-compatible `/audio/transcriptions`). The default transcription model is **`gpt-4o-mini-transcribe`** unless you override it under `tools.media.audio.models` or your agent media settings.
 
 For **outbound speech**, if your OpenAI-compatible TTS `baseUrl` matches `LITELLM_API_BASE` (after trimming trailing slashes) and you do not set `messages.tts.openai.model`, synthesis defaults to **`gpt-4o-audio-preview`** for parity with the inbound path.
 
