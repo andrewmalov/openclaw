@@ -46,6 +46,48 @@ export type SlashCommandResult = {
   };
 };
 
+/** Result shape from gateway `sessions.compact` (transcript line retention). */
+type SessionsCompactRpcResult = {
+  ok?: boolean;
+  compacted?: boolean;
+  key?: string;
+  reason?: string;
+  kept?: number;
+  archived?: string;
+};
+
+function formatSessionsCompactReply(result: SessionsCompactRpcResult): SlashCommandResult {
+  if (result.compacted === true) {
+    const kept =
+      typeof result.kept === "number" && result.kept > 0
+        ? ` Kept the last **${result.kept}** non-empty lines.`
+        : "";
+    return {
+      content: `**Transcript compacted.**${kept}`,
+      action: "refresh",
+    };
+  }
+  if (result.reason === "no sessionId") {
+    return {
+      content: "Compaction skipped: no session is bound to this chat yet.",
+      action: "refresh",
+    };
+  }
+  if (result.reason === "no transcript") {
+    return {
+      content: "Compaction skipped: no transcript file was found.",
+      action: "refresh",
+    };
+  }
+  if (result.compacted === false && typeof result.kept === "number") {
+    return {
+      content: `No transcript compaction needed: **${result.kept}** lines (within the server retention limit).`,
+      action: "refresh",
+    };
+  }
+  return { content: "Compaction finished with no changes.", action: "refresh" };
+}
+
 export async function executeSlashCommand(
   client: GatewayBrowserClient,
   sessionKey: string,
@@ -114,8 +156,10 @@ async function executeCompact(
   sessionKey: string,
 ): Promise<SlashCommandResult> {
   try {
-    await client.request("sessions.compact", { key: sessionKey });
-    return { content: "Context compacted successfully.", action: "refresh" };
+    const result = await client.request<SessionsCompactRpcResult>("sessions.compact", {
+      key: sessionKey,
+    });
+    return formatSessionsCompactReply(result ?? {});
   } catch (err) {
     return { content: `Compaction failed: ${String(err)}` };
   }

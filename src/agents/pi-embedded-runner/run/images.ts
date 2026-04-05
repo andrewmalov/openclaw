@@ -298,8 +298,24 @@ export async function detectAndLoadPromptImages(params: {
   loadedCount: number;
   skippedCount: number;
 }> {
-  // If model doesn't support images, return empty results
+  // Gateway/RPC may attach images even when model metadata omits "image" (misconfigured catalog).
   if (!modelSupportsImages(params.model)) {
+    const existing = params.existingImages ?? [];
+    if (existing.length > 0) {
+      log.debug(
+        `Native image: model metadata lacks image input; passing ${existing.length} RPC attachment(s) anyway.`,
+      );
+      const imageSanitization: ImageSanitizationLimits = {
+        maxDimensionPx: params.maxDimensionPx,
+      };
+      const sanitized = await sanitizeImagesWithLog(existing, "prompt:images", imageSanitization);
+      return {
+        images: sanitized,
+        detectedRefs: [],
+        loadedCount: 0,
+        skippedCount: 0,
+      };
+    }
     return {
       images: [],
       detectedRefs: [],

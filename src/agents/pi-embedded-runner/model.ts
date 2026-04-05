@@ -18,7 +18,7 @@ import {
   buildSuppressedBuiltInModelError,
   shouldSuppressBuiltInModel,
 } from "../model-suppression.js";
-import { discoverAuthStorage, discoverModels } from "../pi-model-discovery.js";
+import * as modelRegistryAccess from "./model-registry-access.js";
 import { normalizeResolvedProviderModel } from "./model.provider-normalization.js";
 
 type InlineModelEntry = ModelDefinitionConfig & {
@@ -32,6 +32,25 @@ type InlineProviderConfig = {
   models?: ModelDefinitionConfig[];
   headers?: unknown;
 };
+
+/** When model input is unset, assume multimodal for OpenAI-compatible APIs (LiteLLM, proxies). */
+function defaultInputForOpenAiCompatibleApi(api: string | undefined): Array<"text" | "image"> {
+  if (api === "openai-responses" || api === "openai-completions") {
+    return ["text", "image"];
+  }
+  return ["text"];
+}
+
+function resolveSyntheticModelInput(params: {
+  configuredModel: ModelDefinitionConfig | undefined;
+  api: ModelDefinitionConfig["api"] | undefined;
+}): Array<"text" | "image"> {
+  const resolvedInput = params.configuredModel?.input;
+  if (Array.isArray(resolvedInput) && resolvedInput.length > 0) {
+    return resolvedInput.filter((item) => item === "text" || item === "image");
+  }
+  return defaultInputForOpenAiCompatibleApi(params.api);
+}
 
 function sanitizeModelHeaders(
   headers: unknown,
@@ -122,15 +141,16 @@ function applyConfiguredProviderOverrides(params: {
       headers: discoveredHeaders,
     };
   }
+  const effectiveApi = configuredModel?.api ?? providerConfig.api ?? discoveredModel.api;
   const resolvedInput = configuredModel?.input ?? discoveredModel.input;
   const normalizedInput =
     Array.isArray(resolvedInput) && resolvedInput.length > 0
       ? resolvedInput.filter((item) => item === "text" || item === "image")
-      : (["text"] as Array<"text" | "image">);
+      : defaultInputForOpenAiCompatibleApi(effectiveApi);
 
   return {
     ...discoveredModel,
-    api: configuredModel?.api ?? providerConfig.api ?? discoveredModel.api,
+    api: effectiveApi,
     baseUrl: providerConfig.baseUrl ?? discoveredModel.baseUrl,
     reasoning: configuredModel?.reasoning ?? discoveredModel.reasoning,
     input: normalizedInput,
@@ -214,17 +234,33 @@ function resolveExplicitModelWithRegistry(params: {
   const providers = cfg?.models?.providers ?? {};
   const inlineModels = buildInlineProviderModels(providers);
   const normalizedProvider = normalizeProviderId(provider);
-  const inlineMatch = inlineModels.find(
-    (entry) => normalizeProviderId(entry.provider) === normalizedProvider && entry.id === modelId,
-  );
+  const trimmedProvider = provider.trim();
+  // Prefer exact config-key matches (e.g. `qwen` vs `qwen-portal`) before alias-normalized
+  // collisions from `normalizeProviderId` mapping multiple keys to the same id.
+  const inlineMatch =
+    inlineModels.find(
+      (entry) => entry.provider.trim() === trimmedProvider && entry.id === modelId,
+    ) ??
+    inlineModels.find(
+      (entry) => normalizeProviderId(entry.provider) === normalizedProvider && entry.id === modelId,
+    );
   if (inlineMatch?.api) {
+    const base = inlineMatch as Model<Api>;
+    const resolvedInput = base.input;
+    const normalizedInput =
+      Array.isArray(resolvedInput) && resolvedInput.length > 0
+        ? resolvedInput.filter((item) => item === "text" || item === "image")
+        : defaultInputForOpenAiCompatibleApi(base.api);
     return {
       kind: "resolved",
       model: normalizeResolvedModel({
         provider,
         cfg,
         agentDir,
-        model: inlineMatch as Model<Api>,
+        model: {
+          ...base,
+          input: normalizedInput,
+        },
       }),
     };
   }
@@ -266,7 +302,11 @@ export function resolveModelWithRegistry(params: {
       provider,
       cfg,
       agentDir,
-      model: pluginDynamicModel,
+      model: applyConfiguredProviderOverrides({
+        discoveredModel: pluginDynamicModel,
+        providerConfig,
+        modelId,
+      }),
     });
   }
 
@@ -278,6 +318,8 @@ export function resolveModelWithRegistry(params: {
     stripSecretRefMarkers: true,
   });
   if (providerConfig || modelId.startsWith("mock-")) {
+    const effectiveApi =
+      configuredModel?.api ?? providerConfig?.api ?? ("openai-responses" as const);
     return normalizeResolvedModel({
       provider,
       cfg,
@@ -285,11 +327,14 @@ export function resolveModelWithRegistry(params: {
       model: {
         id: modelId,
         name: modelId,
-        api: providerConfig?.api ?? "openai-responses",
+        api: effectiveApi,
         provider,
         baseUrl: providerConfig?.baseUrl,
         reasoning: configuredModel?.reasoning ?? false,
-        input: ["text"],
+        input: resolveSyntheticModelInput({
+          configuredModel,
+          api: effectiveApi,
+        }),
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow:
           configuredModel?.contextWindow ??
@@ -320,8 +365,8 @@ export function resolveModel(
   modelRegistry: ModelRegistry;
 } {
   const resolvedAgentDir = agentDir ?? resolveOpenClawAgentDir();
-  const authStorage = discoverAuthStorage(resolvedAgentDir);
-  const modelRegistry = discoverModels(authStorage, resolvedAgentDir);
+  const authStorage = modelRegistryAccess.discoverAuthStorage(resolvedAgentDir);
+  const modelRegistry = modelRegistryAccess.discoverModels(authStorage, resolvedAgentDir);
   const model = resolveModelWithRegistry({
     provider,
     modelId,
@@ -352,8 +397,8 @@ export async function resolveModelAsync(
   modelRegistry: ModelRegistry;
 }> {
   const resolvedAgentDir = agentDir ?? resolveOpenClawAgentDir();
-  const authStorage = discoverAuthStorage(resolvedAgentDir);
-  const modelRegistry = discoverModels(authStorage, resolvedAgentDir);
+  const authStorage = modelRegistryAccess.discoverAuthStorage(resolvedAgentDir);
+  const modelRegistry = modelRegistryAccess.discoverModels(authStorage, resolvedAgentDir);
   const explicitModel = resolveExplicitModelWithRegistry({
     provider,
     modelId,

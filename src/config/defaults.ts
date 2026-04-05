@@ -55,6 +55,16 @@ function resolveDefaultProviderApi(
   return normalizeProviderId(providerId) === "anthropic" ? "anthropic-messages" : undefined;
 }
 
+/** OpenAI-compatible chat APIs commonly support multimodal; default vision-capable input when unset. */
+function resolveDefaultModelInputForApi(
+  api: ModelDefinitionConfig["api"] | undefined,
+): ModelDefinitionConfig["input"] {
+  if (api === "openai-responses" || api === "openai-completions") {
+    return ["text", "image"];
+  }
+  return [...DEFAULT_MODEL_INPUT];
+}
+
 function isPositiveNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
@@ -238,11 +248,6 @@ export function applyModelDefaults(cfg: OpenClawConfig): OpenClawConfig {
           modelMutated = true;
         }
 
-        const input = raw.input ?? [...DEFAULT_MODEL_INPUT];
-        if (raw.input === undefined) {
-          modelMutated = true;
-        }
-
         const cost = resolveModelCost(raw.cost);
         const costMutated =
           !raw.cost ||
@@ -269,6 +274,11 @@ export function applyModelDefaults(cfg: OpenClawConfig): OpenClawConfig {
         }
         const api = raw.api ?? providerApi;
         if (raw.api !== api) {
+          modelMutated = true;
+        }
+
+        const input = raw.input ?? resolveDefaultModelInputForApi(api);
+        if (raw.input === undefined) {
           modelMutated = true;
         }
 

@@ -147,4 +147,34 @@ describe("applyModelDefaults", () => {
     const model = next.models?.providers?.myproxy?.models?.[0];
     expect(model?.api).toBe("openai-completions");
   });
+
+  it("defaults input to text+image for openai-completions when model input is omitted", () => {
+    // Intentionally omit `input` on the model to assert applyModelDefaults fills it in.
+    const cfg = {
+      models: {
+        providers: {
+          litellm: {
+            baseUrl: "https://proxy.example/v1",
+            apiKey: "sk-test",
+            api: "openai-completions",
+            models: [
+              {
+                id: "google/gemini-3-flash-preview",
+                name: "Gemini 3 Flash",
+                reasoning: false,
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                contextWindow: 200_000,
+                maxTokens: 8192,
+              },
+            ],
+          },
+        },
+      },
+    } as unknown as OpenClawConfig;
+
+    const next = applyModelDefaults(cfg);
+    const model = next.models?.providers?.litellm?.models?.[0];
+
+    expect(model?.input).toEqual(["text", "image"]);
+  });
 });

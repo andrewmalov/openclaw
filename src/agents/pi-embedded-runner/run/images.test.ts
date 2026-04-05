@@ -252,15 +252,19 @@ describe("loadImageFromRef", () => {
 });
 
 describe("detectAndLoadPromptImages", () => {
-  it("returns no images for non-vision models even when existing images are provided", async () => {
+  it("passes through RPC existingImages when model metadata omits vision", async () => {
+    const pngB64 =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/woAAn8B9FD5fHAAAAAASUVORK5CYII=";
     const result = await detectAndLoadPromptImages({
       prompt: "ignore",
       workspaceDir: "/tmp",
       model: { input: ["text"] },
-      existingImages: [{ type: "image", data: "abc", mimeType: "image/png" }],
+      existingImages: [{ type: "image", data: pngB64, mimeType: "image/png" }],
     });
 
-    expectNoPromptImages(result);
+    expect(result.detectedRefs).toHaveLength(0);
+    expect(result.images.length).toBeGreaterThanOrEqual(1);
+    expect(result.images[0]?.type).toBe("image");
   });
 
   it("returns no detected refs when prompt has no image references", async () => {

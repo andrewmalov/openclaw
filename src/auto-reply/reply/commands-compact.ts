@@ -17,6 +17,22 @@ import type { CommandHandler } from "./commands-types.js";
 import { stripMentions, stripStructuralPrefixes } from "./mentions.js";
 import { incrementCompactionCount } from "./session-updates.js";
 
+/** Pi throws this generic message for safeguard cancel, abort, and post-LLM abort races. */
+export const COMPACTION_CANCELLED_HINT =
+  "This usually means the compaction safeguard declined to change history, the compaction model/API key was missing, summarization failed (see gateway logs for “Compaction safeguard”), or compaction was aborted (timeout, /stop, or overlapping run). Check `agents.defaults.compaction` (mode, model, timeout) and provider auth.";
+
+/** @internal Exported for unit tests. */
+export function appendCompactionCancelledDiagnosisIfNeeded(
+  rawReason: string | undefined,
+  headline: string,
+): string {
+  const trimmed = rawReason?.trim() ?? "";
+  if (trimmed && /compaction cancelled/i.test(trimmed)) {
+    return `${headline}\n\n${COMPACTION_CANCELLED_HINT}`;
+  }
+  return headline;
+}
+
 function extractCompactInstructions(params: {
   rawBody?: string;
   ctx: import("../templating.js").MsgContext;
@@ -136,10 +152,11 @@ export const handleCompactCommand: CommandHandler = async (params) => {
     typeof totalTokens === "number" && totalTokens > 0 ? totalTokens : null,
     params.contextTokens ?? params.sessionEntry.contextTokens ?? null,
   );
-  const reason = result.reason?.trim();
-  const line = reason
-    ? `${compactLabel}: ${reason} • ${contextSummary}`
+  const rawReason = result.reason?.trim();
+  const headline = rawReason
+    ? `${compactLabel}: ${rawReason} • ${contextSummary}`
     : `${compactLabel} • ${contextSummary}`;
+  const line = appendCompactionCancelledDiagnosisIfNeeded(rawReason, headline);
   enqueueSystemEvent(line, { sessionKey: params.sessionKey });
   return { shouldContinue: false, reply: { text: `⚙️ ${line}` } };
 };

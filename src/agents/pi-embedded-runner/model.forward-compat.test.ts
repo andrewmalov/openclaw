@@ -1,10 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("../pi-model-discovery.js", () => ({
-  discoverAuthStorage: vi.fn(() => ({ mocked: true })),
-  discoverModels: vi.fn(() => ({ find: vi.fn(() => null) })),
-}));
-
+import { beforeEach, describe, expect, it } from "vitest";
 import { buildInlineProviderModels, resolveModel } from "./model.js";
 import {
   GOOGLE_GEMINI_CLI_FLASH_TEMPLATE_MODEL,

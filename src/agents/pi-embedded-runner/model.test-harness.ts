@@ -1,6 +1,7 @@
+import type { ModelRegistry } from "@mariozechner/pi-coding-agent";
 import { vi } from "vitest";
 import type { ModelDefinitionConfig } from "../../config/types.js";
-import { discoverModels } from "../pi-model-discovery.js";
+import * as modelRegistryAccess from "./model-registry-access.js";
 
 export const makeModel = (id: string): ModelDefinitionConfig => ({
   id,
@@ -105,9 +106,12 @@ export function mockGoogleGeminiCliFlashTemplateModel(): void {
 }
 
 export function resetMockDiscoverModels(): void {
-  vi.mocked(discoverModels).mockReturnValue({
-    find: vi.fn(() => null),
-  } as unknown as ReturnType<typeof discoverModels>);
+  vi.spyOn(modelRegistryAccess, "discoverModels").mockImplementation(
+    () =>
+      ({
+        find: vi.fn(() => null),
+      }) as unknown as ModelRegistry,
+  );
 }
 
 export function mockDiscoveredModel(params: {
@@ -115,12 +119,15 @@ export function mockDiscoveredModel(params: {
   modelId: string;
   templateModel: unknown;
 }): void {
-  vi.mocked(discoverModels).mockReturnValue({
-    find: vi.fn((provider: string, modelId: string) => {
-      if (provider === params.provider && modelId === params.modelId) {
-        return params.templateModel;
-      }
-      return null;
-    }),
-  } as unknown as ReturnType<typeof discoverModels>);
+  vi.spyOn(modelRegistryAccess, "discoverModels").mockImplementation(
+    () =>
+      ({
+        find: vi.fn((provider: string, modelId: string) => {
+          if (provider === params.provider && modelId === params.modelId) {
+            return params.templateModel;
+          }
+          return null;
+        }),
+      }) as unknown as ModelRegistry,
+  );
 }

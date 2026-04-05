@@ -34,7 +34,7 @@ export const SLASH_COMMANDS: SlashCommandDef[] = [
   },
   {
     name: "compact",
-    description: "Compact session context",
+    description: "Trim session transcript (gateway retention)",
     icon: "loader",
     category: "session",
     executeLocal: true,

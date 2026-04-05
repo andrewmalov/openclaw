@@ -209,7 +209,8 @@ export async function buildStatusReply(params: {
     },
     subagentsLine,
     mediaDecisions: params.mediaDecisions,
-    includeTranscriptUsage: false,
+    // Match session_status tool: prefer tail-of-transcript usage when store totals lag.
+    includeTranscriptUsage: true,
   });
 
   return { text: statusText };

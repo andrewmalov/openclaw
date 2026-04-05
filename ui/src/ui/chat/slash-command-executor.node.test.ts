@@ -449,3 +449,61 @@ describe("executeSlashCommand directives", () => {
     });
   });
 });
+
+describe("executeSlashCommand /compact", () => {
+  it("reports successful transcript compaction with kept line count", async () => {
+    const request = vi.fn().mockResolvedValue({
+      ok: true,
+      compacted: true,
+      kept: 400,
+    });
+
+    const result = await executeSlashCommand(
+      { request } as unknown as GatewayBrowserClient,
+      "main",
+      "compact",
+      "",
+    );
+
+    expect(result.action).toBe("refresh");
+    expect(result.content).toBe("**Transcript compacted.** Kept the last **400** non-empty lines.");
+    expect(request).toHaveBeenCalledWith("sessions.compact", { key: "main" });
+  });
+
+  it("reports when compaction is a no-op under the line limit", async () => {
+    const request = vi.fn().mockResolvedValue({
+      ok: true,
+      compacted: false,
+      kept: 120,
+    });
+
+    const result = await executeSlashCommand(
+      { request } as unknown as GatewayBrowserClient,
+      "main",
+      "compact",
+      "",
+    );
+
+    expect(result.action).toBe("refresh");
+    expect(result.content).toBe(
+      "No transcript compaction needed: **120** lines (within the server retention limit).",
+    );
+  });
+
+  it("reports missing session binding", async () => {
+    const request = vi.fn().mockResolvedValue({
+      ok: true,
+      compacted: false,
+      reason: "no sessionId",
+    });
+
+    const result = await executeSlashCommand(
+      { request } as unknown as GatewayBrowserClient,
+      "main",
+      "compact",
+      "",
+    );
+
+    expect(result.content).toBe("Compaction skipped: no session is bound to this chat yet.");
+  });
+});

@@ -1,24 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("../pi-model-discovery.js", () => ({
-  discoverAuthStorage: vi.fn(() => ({ mocked: true })),
-  discoverModels: vi.fn(() => ({ find: vi.fn(() => null) })),
-}));
-
-import type { OpenRouterModelCapabilities } from "./openrouter-model-capabilities.js";
-
-const mockGetOpenRouterModelCapabilities = vi.fn<
-  (modelId: string) => OpenRouterModelCapabilities | undefined
->(() => undefined);
-const mockLoadOpenRouterModelCapabilities = vi.fn<(modelId: string) => Promise<void>>(
-  async () => {},
-);
-vi.mock("./openrouter-model-capabilities.js", () => ({
-  getOpenRouterModelCapabilities: (modelId: string) => mockGetOpenRouterModelCapabilities(modelId),
-  loadOpenRouterModelCapabilities: (modelId: string) =>
-    mockLoadOpenRouterModelCapabilities(modelId),
-}));
-
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
 import { buildInlineProviderModels, resolveModel, resolveModelAsync } from "./model.js";
 import {
@@ -28,13 +11,23 @@ import {
   mockOpenAICodexTemplateModel,
   resetMockDiscoverModels,
 } from "./model.test-harness.js";
+import type { OpenRouterModelCapabilities } from "./openrouter-model-capabilities.js";
+import { resetOpenRouterModelCapabilitiesStateForTest } from "./openrouter-model-capabilities.js";
+
+const OPENROUTER_MODELS_DISK = "openrouter-models.json";
+
+function writeOpenRouterDiskCatalogForTest(
+  stateDir: string,
+  models: Record<string, OpenRouterModelCapabilities>,
+): void {
+  const cacheDir = join(stateDir, "cache");
+  mkdirSync(cacheDir, { recursive: true });
+  writeFileSync(join(cacheDir, OPENROUTER_MODELS_DISK), JSON.stringify({ models }), "utf-8");
+}
 
 beforeEach(() => {
   resetMockDiscoverModels();
-  mockGetOpenRouterModelCapabilities.mockReset();
-  mockGetOpenRouterModelCapabilities.mockReturnValue(undefined);
-  mockLoadOpenRouterModelCapabilities.mockReset();
-  mockLoadOpenRouterModelCapabilities.mockResolvedValue();
+  resetOpenRouterModelCapabilitiesStateForTest();
 });
 
 function buildForwardCompatTemplate(params: {
@@ -220,7 +213,7 @@ describe("buildInlineProviderModels", () => {
 });
 
 describe("resolveModel", () => {
-  it("defaults model input to text when discovery omits input", () => {
+  it("defaults model input to text+image for openai-completions when discovery omits input", () => {
     mockDiscoveredModel({
       provider: "custom",
       modelId: "missing-input",
@@ -253,7 +246,7 @@ describe("resolveModel", () => {
 
     expect(result.error).toBeUndefined();
     expect(Array.isArray(result.model?.input)).toBe(true);
-    expect(result.model?.input).toEqual(["text"]);
+    expect(result.model?.input).toEqual(["text", "image"]);
   });
 
   it("includes provider baseUrl in fallback model", () => {
@@ -400,138 +393,169 @@ describe("resolveModel", () => {
     expect(result.model?.reasoning).toBe(true);
   });
 
-  it("matches prefixed OpenRouter native ids in configured fallback models", () => {
-    const cfg = {
-      models: {
-        providers: {
-          openrouter: {
-            baseUrl: "https://openrouter.ai/api/v1",
-            api: "openai-completions",
-            models: [
-              {
-                ...makeModel("openrouter/healer-alpha"),
-                reasoning: true,
-                input: ["text", "image"],
-                contextWindow: 262144,
-                maxTokens: 65536,
-              },
-            ],
+  describe("openrouter", () => {
+    let openRouterStateDir: string;
+    let prevOpenRouterStateDir: string | undefined;
+
+    beforeEach(() => {
+      resetOpenRouterModelCapabilitiesStateForTest();
+      prevOpenRouterStateDir = process.env.OPENCLAW_STATE_DIR;
+      openRouterStateDir = mkdtempSync(join(tmpdir(), "openclaw-resolvemodel-openrouter-"));
+      process.env.OPENCLAW_STATE_DIR = openRouterStateDir;
+    });
+
+    afterEach(() => {
+      rmSync(openRouterStateDir, { recursive: true, force: true });
+      if (prevOpenRouterStateDir === undefined) {
+        delete process.env.OPENCLAW_STATE_DIR;
+      } else {
+        process.env.OPENCLAW_STATE_DIR = prevOpenRouterStateDir;
+      }
+    });
+
+    it("matches prefixed OpenRouter native ids in configured fallback models", () => {
+      const cfg = {
+        models: {
+          providers: {
+            openrouter: {
+              baseUrl: "https://openrouter.ai/api/v1",
+              api: "openai-completions",
+              models: [
+                {
+                  ...makeModel("openrouter/healer-alpha"),
+                  reasoning: true,
+                  input: ["text", "image"],
+                  contextWindow: 262144,
+                  maxTokens: 65536,
+                },
+              ],
+            },
           },
         },
-      },
-    } as OpenClawConfig;
+      } as OpenClawConfig;
 
-    const result = resolveModel("openrouter", "openrouter/healer-alpha", "/tmp/agent", cfg);
+      const result = resolveModel("openrouter", "openrouter/healer-alpha", "/tmp/agent", cfg);
 
-    expect(result.error).toBeUndefined();
-    expect(result.model).toMatchObject({
-      provider: "openrouter",
-      id: "openrouter/healer-alpha",
-      reasoning: true,
-      input: ["text", "image"],
-      contextWindow: 262144,
-      maxTokens: 65536,
-    });
-  });
-
-  it("uses OpenRouter API capabilities for unknown models when cache is populated", () => {
-    mockGetOpenRouterModelCapabilities.mockReturnValue({
-      name: "Healer Alpha",
-      input: ["text", "image"],
-      reasoning: true,
-      contextWindow: 262144,
-      maxTokens: 65536,
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      expect(result.error).toBeUndefined();
+      expect(result.model).toMatchObject({
+        provider: "openrouter",
+        id: "openrouter/healer-alpha",
+        reasoning: true,
+        input: ["text", "image"],
+        contextWindow: 262144,
+        maxTokens: 65536,
+      });
     });
 
-    const result = resolveModel("openrouter", "openrouter/healer-alpha", "/tmp/agent");
+    it("uses OpenRouter API capabilities for unknown models when cache is populated", () => {
+      // On-disk catalog is shared with jiti-loaded provider code (in-memory seed is not).
+      writeOpenRouterDiskCatalogForTest(openRouterStateDir, {
+        "openrouter/healer-alpha": {
+          name: "Healer Alpha",
+          input: ["text", "image"],
+          reasoning: true,
+          contextWindow: 262144,
+          maxTokens: 65536,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        },
+      });
 
-    expect(result.error).toBeUndefined();
-    expect(result.model).toMatchObject({
-      provider: "openrouter",
-      id: "openrouter/healer-alpha",
-      name: "Healer Alpha",
-      reasoning: true,
-      input: ["text", "image"],
-      contextWindow: 262144,
-      maxTokens: 65536,
+      const result = resolveModel("openrouter", "openrouter/healer-alpha", "/tmp/agent");
+
+      expect(result.error).toBeUndefined();
+      expect(result.model).toMatchObject({
+        provider: "openrouter",
+        id: "openrouter/healer-alpha",
+        name: "Healer Alpha",
+        reasoning: true,
+        input: ["text", "image"],
+        contextWindow: 262144,
+        maxTokens: 65536,
+      });
     });
-  });
 
-  it("falls back to text-only when OpenRouter API cache is empty", () => {
-    mockGetOpenRouterModelCapabilities.mockReturnValue(undefined);
+    it("falls back to text-only when OpenRouter API cache is empty", () => {
+      // Use an id not present in any disk seed: jiti keeps its own in-memory cache across tests,
+      // so `openrouter/healer-alpha` may still be cached from earlier cases in this describe.
+      const id = "openrouter/cache-miss-fallback-test";
+      const result = resolveModel("openrouter", id, "/tmp/agent");
 
-    const result = resolveModel("openrouter", "openrouter/healer-alpha", "/tmp/agent");
-
-    expect(result.error).toBeUndefined();
-    expect(result.model).toMatchObject({
-      provider: "openrouter",
-      id: "openrouter/healer-alpha",
-      reasoning: false,
-      input: ["text"],
+      expect(result.error).toBeUndefined();
+      expect(result.model).toMatchObject({
+        provider: "openrouter",
+        id,
+        reasoning: false,
+        input: ["text"],
+      });
     });
-  });
 
-  it("preloads OpenRouter capabilities before first async resolve of an unknown model", async () => {
-    mockLoadOpenRouterModelCapabilities.mockImplementation(async (modelId) => {
-      if (modelId === "google/gemini-3.1-flash-image-preview") {
-        mockGetOpenRouterModelCapabilities.mockReturnValue({
+    it("async resolve applies OpenRouter disk catalog for unknown models after prepareDynamicModel", async () => {
+      writeOpenRouterDiskCatalogForTest(openRouterStateDir, {
+        "google/gemini-3.1-flash-image-preview": {
           name: "Google: Nano Banana 2 (Gemini 3.1 Flash Image Preview)",
           input: ["text", "image"],
           reasoning: true,
           contextWindow: 65536,
           maxTokens: 65536,
           cost: { input: 0.5, output: 3, cacheRead: 0, cacheWrite: 0 },
-        });
-      }
-    });
+        },
+      });
 
-    const result = await resolveModelAsync(
-      "openrouter",
-      "google/gemini-3.1-flash-image-preview",
-      "/tmp/agent",
-    );
+      const result = await resolveModelAsync(
+        "openrouter",
+        "google/gemini-3.1-flash-image-preview",
+        "/tmp/agent",
+      );
 
-    expect(mockLoadOpenRouterModelCapabilities).toHaveBeenCalledWith(
-      "google/gemini-3.1-flash-image-preview",
-    );
-    expect(result.error).toBeUndefined();
-    expect(result.model).toMatchObject({
-      provider: "openrouter",
-      id: "google/gemini-3.1-flash-image-preview",
-      reasoning: true,
-      input: ["text", "image"],
-      contextWindow: 65536,
-      maxTokens: 65536,
-    });
-  });
-
-  it("skips OpenRouter preload for models already present in the registry", async () => {
-    mockDiscoveredModel({
-      provider: "openrouter",
-      modelId: "openrouter/healer-alpha",
-      templateModel: {
-        id: "openrouter/healer-alpha",
-        name: "Healer Alpha",
-        api: "openai-completions",
+      expect(result.error).toBeUndefined();
+      expect(result.model).toMatchObject({
         provider: "openrouter",
-        baseUrl: "https://openrouter.ai/api/v1",
+        id: "google/gemini-3.1-flash-image-preview",
         reasoning: true,
         input: ["text", "image"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        contextWindow: 262144,
+        contextWindow: 65536,
         maxTokens: 65536,
-      },
+      });
     });
 
-    const result = await resolveModelAsync("openrouter", "openrouter/healer-alpha", "/tmp/agent");
+    it("skips OpenRouter preload for models already present in the registry", async () => {
+      mockDiscoveredModel({
+        provider: "openrouter",
+        modelId: "openrouter/healer-alpha",
+        templateModel: {
+          id: "openrouter/healer-alpha",
+          name: "Healer Alpha",
+          api: "openai-completions",
+          provider: "openrouter",
+          baseUrl: "https://openrouter.ai/api/v1",
+          reasoning: true,
+          input: ["text", "image"],
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: 262144,
+          maxTokens: 65536,
+        },
+      });
 
-    expect(mockLoadOpenRouterModelCapabilities).not.toHaveBeenCalled();
-    expect(result.error).toBeUndefined();
-    expect(result.model).toMatchObject({
-      provider: "openrouter",
-      id: "openrouter/healer-alpha",
-      input: ["text", "image"],
+      const fetchSpy = vi.fn();
+      vi.stubGlobal("fetch", fetchSpy);
+
+      try {
+        const result = await resolveModelAsync(
+          "openrouter",
+          "openrouter/healer-alpha",
+          "/tmp/agent",
+        );
+
+        expect(fetchSpy).not.toHaveBeenCalled();
+        expect(result.error).toBeUndefined();
+        expect(result.model).toMatchObject({
+          provider: "openrouter",
+          id: "openrouter/healer-alpha",
+          input: ["text", "image"],
+        });
+      } finally {
+        vi.unstubAllGlobals();
+      }
     });
   });
 
@@ -1158,7 +1182,7 @@ describe("resolveModel", () => {
 
     const result = resolveModel("kimi", "kimi-code", "/tmp/agent", cfg);
     expect(result.error).toBeUndefined();
-    expect(result.model?.id).toBe("kimi-for-coding");
+    expect(result.model?.id).toBe("kimi-code");
     expect((result.model as unknown as { headers?: Record<string, string> }).headers).toEqual({
       "User-Agent": "custom-kimi-client/1.0",
       "X-Kimi-Tenant": "tenant-a",

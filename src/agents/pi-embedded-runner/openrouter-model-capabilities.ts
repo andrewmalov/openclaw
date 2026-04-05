@@ -299,3 +299,16 @@ export function getOpenRouterModelCapabilities(
 
   return result;
 }
+
+/**
+ * Test-only: reset in-memory / fetch state. Bundled plugins load via jiti (separate module instance),
+ * so use `OPENCLAW_STATE_DIR` + on-disk `cache/openrouter-models.json` to share catalog data with provider code.
+ */
+export function resetOpenRouterModelCapabilitiesStateForTest(): void {
+  if (!process.env.VITEST) {
+    return;
+  }
+  cache = undefined;
+  fetchInFlight = undefined;
+  skipNextMissRefresh.clear();
+}
