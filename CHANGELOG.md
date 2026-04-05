@@ -44,6 +44,9 @@ Docs: https://github.com/andrewmalov/openclaw
 
 ### Fixes
 
+- Agents/gateway RPC: transcribe inbound `audio/*` attachments on embedded Pi runs (same `tools.media.audio` path as channel auto-reply) so orchestrator and `agent` RPC voice notes become text in the prompt instead of only `read_file` paths to binary audio.
+- Control UI/WebChat: surface accurate `sessions.compact` outcomes for `/compact` (skip reasons, line counts) instead of always claiming success, and align `/status` context usage with transcript tail data like `session_status`.
+- Commands/compact: when Pi reports `Compaction cancelled`, append a short diagnosis hint (safeguard, auth, timeouts, logs) so channel `/compact` failures are easier to triage.
 - Google auth/Node 25: patch `gaxios` to use native fetch without injecting `globalThis.window`, while translating proxy and mTLS transport settings so Google Vertex and Google Chat auth keep working on Node 25. (#47914) Thanks @pdd-cli.
 - Gateway/startup: load bundled channel plugins from compiled `dist/extensions` entries in built installs, so gateway boot no longer recompiles bundled extension TypeScript on every startup and WhatsApp-class cold starts drop back to seconds instead of tens of seconds or worse. (#47560) Thanks @ngutman.
 - Plugins/context engines: enforce owner-aware context-engine registration on both loader and public SDK paths so plugins cannot spoof privileged ownership, claim the core `legacy` engine id, or overwrite an existing engine id through direct SDK imports. (#47595) Thanks @vincentkoc.
