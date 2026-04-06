@@ -19,6 +19,7 @@ import {
   isFailoverError,
   isTimeoutError,
 } from "./failover-error.js";
+import { findModelInCatalog, loadModelCatalog, modelSupportsVision } from "./model-catalog.js";
 import { logModelFallbackDecision } from "./model-fallback-observation.js";
 import type { FallbackAttempt, ModelCandidate } from "./model-fallback.types.js";
 import {
@@ -253,6 +254,66 @@ function resolveImageFallbackCandidates(params: {
   }
 
   return candidates;
+}
+
+/**
+ * When the user sends image attachments, prepend configured `agents.defaults.imageModel`
+ * candidates so the run does not hit a text-only primary first (OpenRouter/LiteLLM
+ * "No endpoints found that support image input").
+ */
+function mergeInboundImageCandidatesAhead(params: {
+  cfg: OpenClawConfig | undefined;
+  defaultProvider: string;
+  modelOverride?: string;
+  baseCandidates: ModelCandidate[];
+}): ModelCandidate[] {
+  const imageCandidates = resolveImageFallbackCandidates({
+    cfg: params.cfg,
+    defaultProvider: params.defaultProvider,
+    modelOverride: params.modelOverride,
+  });
+  if (imageCandidates.length === 0) {
+    return params.baseCandidates;
+  }
+  const seen = new Set<string>();
+  const merged: ModelCandidate[] = [];
+  const add = (candidate: ModelCandidate) => {
+    const key = modelKey(candidate.provider, candidate.model);
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    merged.push(candidate);
+  };
+  for (const candidate of imageCandidates) {
+    add(candidate);
+  }
+  for (const candidate of params.baseCandidates) {
+    add(candidate);
+  }
+  return merged;
+}
+
+/**
+ * For inbound image payloads, decide whether to reorder model fallback so `imageModel`
+ * is tried first. Uses the model catalog when available; unknown models are treated as
+ * non-vision so image routing still applies.
+ */
+export async function resolveInboundImageModelFallbackHints(params: {
+  cfg: OpenClawConfig | undefined;
+  provider: string;
+  model: string;
+  hasInboundImages: boolean;
+}): Promise<{ inboundImageAttachments: boolean; primarySupportsVision: boolean }> {
+  if (!params.hasInboundImages) {
+    return { inboundImageAttachments: false, primarySupportsVision: false };
+  }
+  const catalog = await loadModelCatalog({ config: params.cfg });
+  const entry = findModelInCatalog(catalog, params.provider, params.model);
+  return {
+    inboundImageAttachments: true,
+    primarySupportsVision: modelSupportsVision(entry),
+  };
 }
 
 function resolveFallbackCandidates(params: {
@@ -516,15 +577,31 @@ export async function runWithModelFallback<T>(params: {
   agentDir?: string;
   /** Optional explicit fallbacks list; when provided (even empty), replaces agents.defaults.model.fallbacks. */
   fallbacksOverride?: string[];
+  /**
+   * Inbound user message includes image attachment(s) (RPC/embedded). When set with
+   * `primarySupportsVision: false`, `agents.defaults.imageModel` candidates are tried
+   * before the default model chain.
+   */
+  inboundImageAttachments?: boolean;
+  /** When true, skip image-first reorder (primary already supports vision in catalog). */
+  primarySupportsVision?: boolean;
   run: ModelFallbackRunFn<T>;
   onError?: ModelFallbackErrorHandler;
 }): Promise<ModelFallbackRunResult<T>> {
-  const candidates = resolveFallbackCandidates({
+  let candidates = resolveFallbackCandidates({
     cfg: params.cfg,
     provider: params.provider,
     model: params.model,
     fallbacksOverride: params.fallbacksOverride,
   });
+  if (params.inboundImageAttachments && !params.primarySupportsVision) {
+    candidates = mergeInboundImageCandidatesAhead({
+      cfg: params.cfg,
+      defaultProvider: DEFAULT_PROVIDER,
+      modelOverride: undefined,
+      baseCandidates: candidates,
+    });
+  }
   const authStore = params.cfg
     ? ensureAuthProfileStore(params.agentDir, { allowKeychainPrompt: false })
     : null;

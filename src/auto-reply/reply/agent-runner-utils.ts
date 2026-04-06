@@ -168,6 +168,29 @@ export function resolveModelFallbackOptions(run: FollowupRun["run"]) {
   };
 }
 
+/** True when the reply run includes user image bytes (embedded/RPC), not tool-generated images. */
+export function hasInboundImagePayload(opts?: {
+  images?: unknown[] | null;
+  attachments?: Array<{ type?: string; mimeType?: string | null }> | null;
+}): boolean {
+  if (!opts) {
+    return false;
+  }
+  if ((opts.images?.length ?? 0) > 0) {
+    return true;
+  }
+  return (
+    opts.attachments?.some((a) => {
+      const t = String(a.type ?? "").toLowerCase();
+      if (t === "image") {
+        return true;
+      }
+      const mime = String(a.mimeType ?? "").toLowerCase();
+      return mime.startsWith("image/");
+    }) ?? false
+  );
+}
+
 export function buildEmbeddedRunBaseParams(params: {
   run: FollowupRun["run"];
   provider: string;

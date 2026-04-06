@@ -1401,6 +1401,63 @@ describe("runWithModelFallback", () => {
   });
 });
 
+describe("runWithModelFallback inbound image routing", () => {
+  it("tries imageModel before primary when inbound images and primary lacks vision in catalog", async () => {
+    const cfg = makeCfg({
+      agents: {
+        defaults: {
+          model: {
+            primary: "openrouter/step-3.5-flash",
+            fallbacks: [],
+          },
+          imageModel: {
+            primary: "openrouter/google/gemini-3-flash-preview",
+          },
+        },
+      },
+    });
+    const run = vi.fn().mockResolvedValue("ok");
+    const result = await runWithModelFallback({
+      cfg,
+      provider: "openrouter",
+      model: "step-3.5-flash",
+      inboundImageAttachments: true,
+      primarySupportsVision: false,
+      run,
+    });
+    expect(result.result).toBe("ok");
+    expect(run.mock.calls[0]?.[0]).toBe("openrouter");
+    expect(run.mock.calls[0]?.[1]).toBe("google/gemini-3-flash-preview");
+  });
+
+  it("does not prepend imageModel when primary already supports vision", async () => {
+    const cfg = makeCfg({
+      agents: {
+        defaults: {
+          model: {
+            primary: "openai/gpt-4.1-mini",
+            fallbacks: [],
+          },
+          imageModel: {
+            primary: "anthropic/claude-haiku-3-5",
+          },
+        },
+      },
+    });
+    const run = vi.fn().mockResolvedValue("ok");
+    await runWithModelFallback({
+      cfg,
+      provider: "openai",
+      model: "gpt-4.1-mini",
+      inboundImageAttachments: true,
+      primarySupportsVision: true,
+      run,
+    });
+    expect(run.mock.calls[0]?.[0]).toBe("openai");
+    expect(run.mock.calls[0]?.[1]).toBe("gpt-4.1-mini");
+  });
+});
+
 describe("runWithImageModelFallback", () => {
   it("keeps explicit image fallbacks reachable when models allowlist is present", async () => {
     const cfg = makeCfg({

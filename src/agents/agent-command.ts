@@ -7,6 +7,7 @@ import { resolveAcpSessionCwd } from "../acp/runtime/session-identifiers.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 
 const log = createSubsystemLogger("agents/agent-command");
+import { hasInboundImagePayload } from "../auto-reply/reply/agent-runner-utils.js";
 import { normalizeReplyPayload } from "../auto-reply/reply/normalize-reply.js";
 import {
   formatThinkingLevels,
@@ -75,7 +76,7 @@ import { FailoverError } from "./failover-error.js";
 import { formatAgentInternalEventsForPrompt } from "./internal-events.js";
 import { AGENT_LANE_SUBAGENT } from "./lanes.js";
 import { loadModelCatalog } from "./model-catalog.js";
-import { runWithModelFallback } from "./model-fallback.js";
+import { resolveInboundImageModelFallbackHints, runWithModelFallback } from "./model-fallback.js";
 import {
   buildAllowedModelSet,
   isCliProvider,
@@ -1102,6 +1103,13 @@ async function agentCommandInternal(
       // Track model fallback attempts so retries on an existing session don't
       // re-inject the original prompt as a duplicate user message.
       let fallbackAttemptIndex = 0;
+      const { inboundImageAttachments, primarySupportsVision } =
+        await resolveInboundImageModelFallbackHints({
+          cfg,
+          provider,
+          model,
+          hasInboundImages: hasInboundImagePayload(opts),
+        });
       const fallbackResult = await runWithModelFallback({
         cfg,
         provider,
@@ -1109,6 +1117,8 @@ async function agentCommandInternal(
         runId,
         agentDir,
         fallbacksOverride: effectiveFallbacksOverride,
+        inboundImageAttachments,
+        primarySupportsVision,
         run: (providerOverride, modelOverride, runOptions) => {
           const isFallbackRetry = fallbackAttemptIndex > 0;
           fallbackAttemptIndex += 1;
